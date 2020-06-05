@@ -1,0 +1,17 @@
+{
+	"name": "emoji-report",
+	"version": "1.0.0",
+	"description": "Review statistics of emoji.",
+	"main": "index.js",
+	"scripts": {
+		"start": "node index.js"
+	},
+	"author": "Alexander Spirgel",
+	"dependencies": {
+		"discord.js": "^12.2.0",
+		"dotenv": "^8.2.0",
+		"emoji-regex": "^9.0.0",
+		"fs": "0.0.1-security",
+		"node-emoji": "^1.10.0"
+	}
+}
