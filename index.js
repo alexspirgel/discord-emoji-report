@@ -3,8 +3,97 @@ const MongoClient = require('mongodb').MongoClient;
 const Discord = require('discord.js');
 const emojiRegex = require('emoji-regex');
 const nodeEmoji = require('node-emoji');
-const GuildDatabaseCollection = require('./classes/GuildDatabaseCollection');
+
+const DateHelpers = require('./classes/DateHelpers');
 const EmojiObject = require('./classes/EmojiObject');
+
+const generateEmojiReportStocks = async (parameters) => {
+
+	const textChannels = getTextChannelsFromLocations(parameters.locations);
+	// console.log(textChannels);
+	
+	const guildEmojis = getGuildEmojis(parameters.message.channel.guild);
+	// console.log(guildEmojis);
+};
+
+const isGuild = (guild) => {
+	try {
+		if (guild.constructor.name === 'Guild') {
+			return true;
+		}
+	}
+	catch (error) {}
+	return false;
+};
+
+const isTextChannel = (textChannel) => {
+	try {
+		if (textChannel.constructor.name === 'TextChannel') {
+			return true;
+		}
+	}
+	catch (error) {}
+	return false;
+};
+
+const getTextChannelsFromLocations = (locationObjects) => {
+	textChannels = [];
+	if (!Array.isArray(locationObjects)) {
+		locationObjects = [locationObjects];
+	}
+	for (item of locationObjects) {
+		if (item.type === 'guild') {
+			let guild;
+			if (isGuild(item.location)) {
+				guild = item.location;
+			}
+			else {
+				const fetchGuild = client.guilds.cache.get(item.location);
+				if (fetchGuild) {
+					guild = fetchGuild;
+				}
+				else {
+					continue;
+				}
+			}
+			const guildTextChannels = getTextChannelsFromGuild(guild);
+			textChannels = textChannels.concat(guildTextChannels);
+		}
+		else if (item.type === 'channel') {
+			// TO-DO
+		}
+	}
+	return textChannels;
+}
+
+const getTextChannelsFromGuild = (guild) => {
+	const textChannels = [];
+	if (isGuild(guild)) {
+		let channel;
+		for (channel of guild.channels.cache.array()) {
+			if (isTextChannel(channel)) {
+				textChannels.push(channel);
+			}
+		}
+	}
+	return textChannels;
+};
+
+const getGuildEmojis = (guild) => {
+	const emoji = [];
+	guild.emojis.cache.each((guildEmoji) => {
+		emoji.push({
+			name: guildEmoji.name,
+			id: guildEmoji.id,
+			string: '<:' + guildEmoji.name + ':' + guildEmoji.id + '>'
+		});
+	});
+	return emoji;
+};
+
+/**
+ * Database
+ */
 
 const runMongoClientCommands = async (mongoClientCommands) => {
 	const mongoConnectionUrl = 'mongodb://localhost:27017';
@@ -64,35 +153,6 @@ const updateGuildDatabaseCollection = async (guild, data) => {
 	return collectionValues;
 };
 
-const addDayToDate = (date) => {
-	date = new Date(date);
-	let nextDay = new Date(new Date(date).setDate(date.getDate() + 1));
-	return nextDay;
-};
-
-const isDateWithinRange = (dateMin, dateMax, date) => {
-	dateMin = new Date(dateMin);
-	dateMax = new Date(dateMax);
-	date = new Date(date);
-	if (date >= dateMin && date <= dateMax) {
-		return true;
-	}
-	else {
-		return false;
-	}
-};
-
-const getGuildEmojis = (guild) => {
-	const emoji = [];
-	guild.emojis.cache.each((guildEmoji) => {
-		emoji.push({
-			name: guildEmoji.name,
-			id: guildEmoji.id,
-			string: '<:' + guildEmoji.name + ':' + guildEmoji.id + '>'
-		});
-	});
-	return emoji;
-};
 
 const getFullDaysWithinDateRange = (dateMin, dateMax) => {
 	const addOneDayToDate = (date) => {
@@ -334,9 +394,9 @@ const getUnicodeEmojiStringsFromString = (string) => {
 	return matches;
 };
 
-const client = new Discord.Client();
+const discordClient = new Discord.Client();
 
-client.on("ready", async () => {
+discordClient.on("ready", async () => {
 	console.log('==========');
 	console.log('==========');
 	console.log('==========');
@@ -347,47 +407,65 @@ client.on("ready", async () => {
 	console.log('==========');
 	console.log('==========');
 	console.log('==========');
-	console.log(`Logged in as ${client.user.tag}!`);
+	console.log(`Logged in as ${discordClient.user.tag}!`);
+	
 	const hiveGuildId = '231204322145337344';
-	const hiveGuild = client.guilds.cache.get(hiveGuildId);
-	const generalChannelId = '231204322145337344';
-	const generalChannel = hiveGuild.channels.cache.get(generalChannelId);
+	const hiveGuild = discordClient.guilds.cache.get(hiveGuildId);
 	const botChannelId = '718193008939368499';
 	const botChannel = hiveGuild.channels.cache.get(botChannelId);
-	await addGuildDatabaseCollection(hiveGuild);
+	
+	const spirgelsGuildId = '717413056086278196';
+	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
+	const testChannelId = '717428158609096764';
+	const testChannel = hiveGuild.channels.cache.get(testChannelId);
+	
+	// await addGuildDatabaseCollection(hiveGuild);
 	// await updateGuildDatabaseCollection(hiveGuild, {abc:123});
-	console.log(await getGuildDatabaseCollection(hiveGuild));
+	// console.log(await getGuildDatabaseCollection(hiveGuild));
 });
 
-client.on("message", async (message) => {
+discordClient.on("message", async (message) => {
 	// FOR TESTING SO IT ONLY RESPONDS TO ME
 	const spirgelUserId = '273695758887157762';
-	if (message.author.id === spirgelUserId) {
-		if (message.content === "!emoji-report") {
-			// message.channel.send("Crawling messages. This may take a while, I'll tag you when I'm finished.");
-			message.channel.send("Test Start.");
+	if (!message.author.bot && message.author.id === spirgelUserId) {
+		if (message.content.includes("!emoji-report help")) {
+			message.reply([
+				"I'm a bot that can show you various statistics about emoji usage on this server.",
+				"Here are some commands you can choose from:",
+				"",
+				"`!emoji-report stocks`",
+				"> Displays all custom emoji usage from the last 30 days, compared to their usage in the previous 30 days. Also displays the biggest winners and losers from the standard emoji set."
+			]);
+		}
+		else if (message.content.includes("!emoji-report stocks") || message.content.includes("!emoji-report stoncks")) {
+			message.channel.send("Generating stocks report. This may take a while, I'll tag you when it's ready.");
+
 			try {
-				const databaseGuildCollection = await getGuildDatabaseCollection(message.channel.guild);
-				if (databaseGuildCollection) {
-					console.log('does not exist');
-				}
-				else {
-					console.log('already exists');
-				}
-				message.reply("Here are your results.");
+				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
+				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -30);
+				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -60);
+				generateEmojiReportStocks({
+					client: discordClient,
+					message: message,
+					locations: {
+						type: 'guild',
+						location: message.channel.guild
+					},
+					compare1DateDayMin: date30DaysPast,
+					compare1DateDayMax: dateNow,
+					compare2DateDayMin: date60DaysPast,
+					compare2DateDayMax: date30DaysPast
+				});
 			}
 			catch (error) {
 				message.reply("Uh-oh, something went wrong, contact Spirgel, I'm just a bot. ¯\\_(ツ)_/¯");
 				console.error(error);
 			}
 		}
-		else if (message.content === "!emoji-report audit") {}
-		else if (message.content === "!emoji-report stocks" || message.content === "!emoji-report stoncks") {
-			// show all custom emoji stocks
-			// show movers and shakers of unicode emoji
+		else if (message.content === "!emoji-report kings" || message.content === "!emoji-report short-kings" || message.content === "!emoji-report queens" || message.content === "!emoji-report qweens") {
+			// show who uses each emoji the most
 		}
-		else if (message.content === "!emoji-report help") {}
 	}
 });
 
-client.login(process.env.BOT_TOKEN);
+discordClient.login(process.env.BOT_TOKEN);

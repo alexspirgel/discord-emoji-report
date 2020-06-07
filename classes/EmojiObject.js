@@ -1,53 +1,78 @@
-/**
- * 
- */
+const DateHelpers = require('./DateHelpers');
+
+/*
+{
+	name = 'name',
+	string = '<:name:123456789>', // or unicode emoji string
+	type = 'custom', // or 'unicode'
+	usage = 'content', // or 'reaction'
+	messageId = '123456789',
+	channelId = '123456789',
+	guildId = '123456789',
+	userId = '123456789',
+	createdTimestamp = 123456789
+}
+*/
 
 const EmojiObject = class {
-	constructor(data) {
-		this.name = data.name;
-		this.string = data.string;
-		this.type = data.type;
-		this.usage = data.usage;
-		this.messageId = data.messageId;
-		this.channelId = data.channelId;
-		this.guildId = data.guildId;
-		this.userId = data.userId;
-		this.createdTimestamp = data.createdTimestamp;
+	static isInstanceOfSelf(instance) {
+		if (instance instanceof this) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	constructor(data, validate = false) {
+		if (validate) {
+			this.data = {};
+			this.name = data.name;
+			this.string = data.string;
+			this.type = data.type;
+			this.usage = data.usage;
+			this.messageId = data.messageId;
+			this.channelId = data.channelId;
+			this.guildId = data.guildId;
+			this.userId = data.userId;
+			this.createdTimestamp = data.createdTimestamp;
+		}
+		else {
+			this.data = data;
+		}
 	}
 	set name(name) {
 		try {
 			if (name) {
 				if (typeof name === 'string') {
-					this._name = name;
+					this.data.name = name;
 				}
 				else {
-					throw new Error('EmojiObject name must be a string.');
+					throw new Error(this.constructor.name + ' name must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a name.');
+				throw new Error(this.constructor.name + ' must have a name.');
 			}
-			
 		}
 		catch (error) {
 			throw error;
 		}
 	}
 	get name() {
-		return this._name;
+		return this.data.name;
 	}
 	set string(string) {
 		try {
 			if (string) {
 				if (typeof string === 'string') {
-					this._string = string;
+					this.data.string = string;
 				}
 				else {
-					throw new Error('EmojiObject string must be a string.');
+					throw new Error(this.constructor.name + ' string must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a string.');
+				throw new Error(this.constructor.name + ' must have a string.');
 			}
 		}
 		catch (error) {
@@ -55,20 +80,20 @@ const EmojiObject = class {
 		}
 	}
 	get string() {
-		return this._string;
+		return this.data.string;
 	}
 	set type(type) {
 		try {
 			if (type) {
 				if (type === 'unicode' || type === 'custom') {
-					this._type = type;
+					this.data.type = type;
 				}
 				else {
-					throw new Error('EmojiObject type must be \'unicode\' or \'custom\'.');
+					throw new Error(this.constructor.name + ' type must be \'unicode\' or \'custom\'.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a type.');
+				throw new Error(this.constructor.name + ' must have a type.');
 			}
 		}
 		catch (error) {
@@ -76,20 +101,20 @@ const EmojiObject = class {
 		}
 	}
 	get type() {
-		return this._type;
+		return this.data.type;
 	}
 	set usage(usage) {
 		try {
 			if (usage) {
 				if (usage === 'content' || usage === 'reaction') {
-					this._usage = usage;
+					this.data.usage = usage;
 				}
 				else {
-					throw new Error('EmojiObject usage must be \'content\' or \'reaction\'.');
+					throw new Error(this.constructor.name + ' usage must be \'content\' or \'reaction\'.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a usage.');
+				throw new Error(this.constructor.name + ' must have a usage.');
 			}
 		}
 		catch (error) {
@@ -97,20 +122,20 @@ const EmojiObject = class {
 		}
 	}
 	get usage() {
-		return this._usage;
+		return this.data.usage;
 	}
 	set messageId(messageId) {
 		try {
 			if (messageId) {
-				if (typeof messageId === 'number') {
-					this._messageId = messageId;
+				if (typeof messageId === 'string') {
+					this.data.messageId = messageId;
 				}
 				else {
-					throw new Error('EmojiObject messageId must be a number.');
+					throw new Error(this.constructor.name + ' messageId must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a messageId.');
+				throw new Error(this.constructor.name + ' must have a messageId.');
 			}
 		}
 		catch (error) {
@@ -118,20 +143,20 @@ const EmojiObject = class {
 		}
 	}
 	get messageId() {
-		return this._messageId;
+		return this.data.messageId;
 	}
 	set channelId(channelId) {
 		try {
 			if (channelId) {
-				if (typeof channelId === 'number') {
-					this._channelId = channelId;
+				if (typeof channelId === 'string') {
+					this.data.channelId = channelId;
 				}
 				else {
-					throw new Error('EmojiObject channelId must be a number.');
+					throw new Error(this.constructor.name + ' channelId must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a channelId.');
+				throw new Error(this.constructor.name + ' must have a channelId.');
 			}
 		}
 		catch (error) {
@@ -139,20 +164,20 @@ const EmojiObject = class {
 		}
 	}
 	get channelId() {
-		return this._channelId;
+		return this.data.channelId;
 	}
 	set guildId(guildId) {
 		try {
 			if (guildId) {
-				if (typeof guildId === 'number') {
-					this._guildId = guildId;
+				if (typeof guildId === 'string') {
+					this.data.guildId = guildId;
 				}
 				else {
-					throw new Error('EmojiObject guildId must be a number.');
+					throw new Error(this.constructor.name + ' guildId must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a guildId.');
+				throw new Error(this.constructor.name + ' must have a guildId.');
 			}
 		}
 		catch (error) {
@@ -160,20 +185,20 @@ const EmojiObject = class {
 		}
 	}
 	get guildId() {
-		return this._guildId;
+		return this.data.guildId;
 	}
 	set userId(userId) {
 		try {
 			if (userId) {
-				if (typeof userId === 'number') {
-					this._userId = userId;
+				if (typeof userId === 'string') {
+					this.data.userId = userId;
 				}
 				else {
-					throw new Error('EmojiObject userId must be a number.');
+					throw new Error(this.constructor.name + ' userId must be a string.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a userId.');
+				throw new Error(this.constructor.name + ' must have a userId.');
 			}
 		}
 		catch (error) {
@@ -181,20 +206,20 @@ const EmojiObject = class {
 		}
 	}
 	get userId() {
-		return this._userId;
+		return this.data.userId;
 	}
 	set createdTimestamp(createdTimestamp) {
 		try {
 			if (createdTimestamp) {
-				if ((new Date(createdTimestamp)).getTime() > 0) {
-					this._createdTimestamp = createdTimestamp;
+				if (typeof createdTimestamp === 'number' && (new Date(createdTimestamp)).getTime() > 0) {
+					this.data.createdTimestamp = createdTimestamp;
 				}
 				else {
-					throw new Error('EmojiObject createdTimestamp must be a timestamp.');
+					throw new Error(this.constructor.name + ' createdTimestamp must be a timestamp.');
 				}
 			}
 			else {
-				throw new Error('EmojiObject must have a createdTimestamp.');
+				throw new Error(this.constructor.name + ' must have a createdTimestamp.');
 			}
 		}
 		catch (error) {
@@ -202,22 +227,7 @@ const EmojiObject = class {
 		}
 	}
 	get createdTimestamp() {
-		return this._createdTimestamp;
-	}
-	/**
-	 * 
-	 */
-	getCreatedDate() {
-		return new Date(this.createdTimestamp);
-	}
-	getCreatedYear() {
-		return this.getCreatedDate().getFullYear();
-	}
-	getCreatedMonth() {
-		return this.getCreatedDate().getMonth() + 1;
-	}
-	getCreatedDay() {
-		return this.getCreatedDate().getDate();
+		return this.data.createdTimestamp;
 	}
 };
 
