@@ -1,7 +1,3 @@
-/**
- * 
- */
-
 const DateHelpers = class {
 	static addDaysToDate(date, days) {
 		date = new Date(date);

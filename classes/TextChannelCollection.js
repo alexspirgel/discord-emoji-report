@@ -6,7 +6,7 @@ const EmojiCollectionInfoObject = require('./EmojiCollectionInfoObject');
 	name: 'Channel Name',
 	channelId: '123456789',
 	guildId: '123456789',
-	emojiCollections: []
+	emojiCollectionInfoObjects: []
 }
 */
 
@@ -25,7 +25,7 @@ const TextChannelCollection = class {
 			this.name = data.name;
 			this.channelId = data.channelId;
 			this.guildId = data.guildId;
-			this.emojiCollections = data.emojiCollections;
+			this.emojiCollectionInfoObjects = data.emojiCollectionInfoObjects;
 		}
 		else {
 			this.data = data;
@@ -94,34 +94,74 @@ const TextChannelCollection = class {
 	get guildId() {
 		return this.data.guildId;
 	}
-	set emojiCollections(emojiCollections) {
+	set emojiCollectionInfoObjects(emojiCollectionInfoObjects) {
 		try {
-			if (emojiCollections) {
-				if (Array.isArray(emojiCollections)) {
+			if (emojiCollectionInfoObjects) {
+				if (Array.isArray(emojiCollectionInfoObjects)) {
 					let i;
-					let emojiCollection;
-					for (i = 0; i < emojiCollections.length; i++) {
-						emojiCollection = emojiCollections[i];
-						if (!EmojiCollectionInfoObject.isInstanceOfSelf(emojiCollection)) {
-							emojiCollection = new EmojiCollectionInfoObject(emojiCollection);
+					let emojiCollectionInfoObject;
+					for (i = 0; i < emojiCollectionInfoObjects.length; i++) {
+						emojiCollectionInfoObject = emojiCollectionInfoObjects[i];
+						if (!EmojiCollectionInfoObject.isInstanceOfSelf(emojiCollectionInfoObject)) {
+							emojiCollectionInfoObject = new EmojiCollectionInfoObject(emojiCollectionInfoObject);
 						}
 					}
-					this.data.emojiCollections = emojiCollections;
+					this.data.emojiCollectionInfoObjects = emojiCollectionInfoObjects;
 				}
 				else {
-					throw new Error(this.constructor.name + ' emojiCollections must be an array.');
+					throw new Error(this.constructor.name + ' emojiCollectionInfoObjects must be an array.');
 				}
 			}
 			else {
-				this.data.emojiCollections = [];
+				this.data.emojiCollectionInfoObjects = [];
 			}
 		}
 		catch (error) {
 			throw error;
 		}
 	}
-	get emojiCollections() {
-		return this.data.emojiCollections;
+	get emojiCollectionInfoObjects() {
+		return this.data.emojiCollectionInfoObjects;
+	}
+	getEmojiCollectionInfoObjectByDate(date, returnIndex = false) {
+		const dateSegments = DateHelpers.getDateSegments(date);
+		let i;
+		let emojiCollectionInfoObject;
+		for (i = 0; i < this.emojiCollectionInfoObjects.length; i++) {
+			emojiCollectionInfoObject = this.emojiCollectionInfoObjects[i];
+			if (emojiCollectionInfoObject.year === dateSegments.year &&
+				emojiCollectionInfoObject.month === dateSegments.month &&
+				emojiCollectionInfoObject.day === dateSegments.day) {
+					if (returnIndex) {
+						return i;
+					}
+					else {
+						return emojiCollectionInfoObject;
+					}
+				}
+		}
+	}
+	setEmojiCollectionInfoObject(date, lastCached, cacheComplete) {
+		const existingEmojiCollectionInfoObject = getEmojiCollectionInfoObjectByDate(date);
+		if (existingEmojiCollectionInfoObject) {
+			existingEmojiCollectionInfoObject.lastCached = lastCached;
+			existingEmojiCollectionInfoObject.cacheComplete = cacheComplete;
+		}
+		else {
+			const dateSegments = DateHelpers.getDateSegments(date);
+			const name = EmojiCollectionInfoObject.generateName(this.guildId, this.channelId, dateSegments.year, dateSegments.month, dateSegments.day);
+			const emojiCollectionInfoObject = new EmojiCollectionInfoObject({
+				name: name,
+				channelId: this.guildId,
+				guildId: this.channelId,
+				year: dateSegments.year,
+				month: dateSegments.month,
+				day: dateSegments.day,
+				lastCached: lastCached,
+				cacheComplete: cacheComplete
+			}, true);
+			this.emojiCollectionInfoObjects.push(emojiCollectionInfoObject);
+		}
 	}
 };
 

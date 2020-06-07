@@ -1,5 +1,3 @@
-const DateHelpers = require('./DateHelpers');
-
 /*
 {
 	name = 'name',

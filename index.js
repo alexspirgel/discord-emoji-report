@@ -153,7 +153,63 @@ const updateGuildDatabaseCollection = async (guild, data) => {
 	return collectionValues;
 };
 
+/**
+ * 
+ */
 
+const isEmojiCollectionCacheFresh = async (client, emojiCollectionInfoObject) => {
+	const channel = client.channels.cache.get(emojiCollectionInfoObject.channelId);
+	const thresholdMessage = await getMostRecentTextChannelMessage(channel, 100);
+	/*
+	- Any emoji created more recently than the 100th most recent message in the channel, is stale.
+	- Any emoji created within the last 2 days, is stale.
+	- Any emoji created more than 30 days ago that haven't been cached at least 30 days after it's creation, is stale.
+			- ^ this one is a bit tricky, it ensures emoji that have been cached 30 days after their creation will never be stale again. Meaning they would only be recached manually at that point if needed.
+	*/
+};
+
+const getMostRecentTextChannelMessage = async (textChannel, offset) => {
+	
+	const mostRecentMessage = await textChannel.messages.fetch(textChannel.lastMessageID);
+	
+	if (offset === undefined || offset === 0) {
+		return mostRecentMessage;
+	}
+	
+	const batchSize = 100;
+	let batchCount;
+	let targetBatchCount = (Math.floor((offset - 1) / batchSize) + 1);
+	let offsetRelativeToBatch = offset % batchSize;
+	if (offsetRelativeToBatch === 0) {
+		offsetRelativeToBatch = batchSize;
+	}
+	
+	let messageBatch;
+	let oldestMessageIdInBatch;
+
+	for (batchCount = 0; batchCount < targetBatchCount; batchCount++) {
+		if (batchCount === 0) {
+			oldestMessageIdInBatch = mostRecentMessage;
+		}
+		else {
+			oldestMessageIdInBatch = messageBatch.last();
+		}
+		// Get next batch.
+		messageBatch = await textChannel.messages.fetch({
+			before: oldestMessageIdInBatch.id,
+			limit: batchSize
+		});
+		// Sort by most recent first because the default order is unreliable.
+		messageBatch.sort((messageA, messageB) => {
+			return messageB.createdTimestamp - messageA.createdTimestamp
+		});
+	}
+	
+	const messageBatchArray = messageBatch.array();
+	return messageBatchArray[offsetRelativeToBatch - 1];
+};
+
+/*
 const getFullDaysWithinDateRange = (dateMin, dateMax) => {
 	const addOneDayToDate = (date) => {
 		return new Date(new Date(date).setDate(date.getDate() + 1));
@@ -393,6 +449,7 @@ const getUnicodeEmojiStringsFromString = (string) => {
 	}
 	return matches;
 };
+*/
 
 const discordClient = new Discord.Client();
 
@@ -418,7 +475,7 @@ discordClient.on("ready", async () => {
 	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
 	const testChannelId = '717428158609096764';
 	const testChannel = hiveGuild.channels.cache.get(testChannelId);
-	
+
 	// await addGuildDatabaseCollection(hiveGuild);
 	// await updateGuildDatabaseCollection(hiveGuild, {abc:123});
 	// console.log(await getGuildDatabaseCollection(hiveGuild));

@@ -1,5 +1,3 @@
-const DateHelpers = require('./DateHelpers');
-
 /*
 {
 	name: '123456789-2020-1-21',
@@ -21,6 +19,9 @@ const EmojiCollectionInfoObject = class {
 		else {
 			return false;
 		}
+	}
+	static generateName(guildId, channelId, year, month, day) {
+		return guildId + '-' + channelId + '-' + year.toString() + '-' + month.toString() + '-' + day.toString();
 	}
 	constructor(data, validate = false) {
 		if (validate) {
