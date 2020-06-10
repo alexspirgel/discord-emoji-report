@@ -17,25 +17,46 @@ const DateHelpers = class {
 	static getDateWithoutTime(date) {
 		return new Date(new Date(date).setHours(0,0,0,0));
 	}
-	static getDateSegments(date) {
+	static getDateYear(date) {
 		date = new Date(date);
+		return date.getFullYear();
+	}
+	static getDateMonth(date) {
+		date = new Date(date);
+		return date.getMonth() + 1;
+	}
+	static getDateDay(date) {
+		date = new Date(date);
+		return date.getDate();
+	}
+	static getDateSegments(date) {
 		return {
-			year: date.getFullYear(),
-			month: date.getMonth() + 1,
-			day: date.getDate()
+			year: this.getDateYear(date),
+			month: this.getDateMonth(date),
+			day: this.getDateDay(date)
 		};
 	}
-	static isDateWithinRange (dateMin, dateMax, date) {
-		dateMin = new Date(dateMin);
-		dateMax = new Date(dateMax);
+	static isDateWithinRange (date, dateMinimum, dateMaximum) {
+		dateMinimum = new Date(dateMinimum);
+		dateMaximum = new Date(dateMaximum);
 		date = new Date(date);
-		if (date >= dateMin && date <= dateMax) {
+		if (date >= dateMinimum && date <= dateMaximum) {
 			return true;
 		}
 		else {
 			return false;
 		}
 	};
+	static getDayDatesFromRange(dateMinimum, dateMaximum) {
+		const dateDayMinimum = this.getDateWithoutTime(dateMinimum);
+		const dateDayMaximum = this.getDateWithoutTime(dateMaximum);
+		const dayDates = [];
+		let date;
+		for (date = dateDayMinimum; date <= dateDayMaximum; date = this.addDaysToDate(date, 1)) {
+			dayDates.push(date);
+		}
+		return dayDates;
+	}
 }
 
 module.exports = DateHelpers;

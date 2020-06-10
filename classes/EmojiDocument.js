@@ -8,11 +8,11 @@
 	channelId = '123456789',
 	guildId = '123456789',
 	userId = '123456789',
-	createdTimestamp = 123456789
+	createdDate = 123
 }
 */
 
-const EmojiObject = class {
+const EmojiDocument = class {
 	static isInstanceOfSelf(instance) {
 		if (instance instanceof this) {
 			return true;
@@ -32,7 +32,7 @@ const EmojiObject = class {
 			this.channelId = data.channelId;
 			this.guildId = data.guildId;
 			this.userId = data.userId;
-			this.createdTimestamp = data.createdTimestamp;
+			this.createdDate = data.createdDate;
 		}
 		else {
 			this.data = data;
@@ -206,27 +206,28 @@ const EmojiObject = class {
 	get userId() {
 		return this.data.userId;
 	}
-	set createdTimestamp(createdTimestamp) {
+	set createdDate(createdDate) {
 		try {
-			if (createdTimestamp) {
-				if (typeof createdTimestamp === 'number' && (new Date(createdTimestamp)).getTime() > 0) {
-					this.data.createdTimestamp = createdTimestamp;
+			if (createdDate) {
+				const timestamp = (new Date(createdDate)).getTime();
+				if (!Number.isNaN(timestamp)) {
+					this.data.createdDate = timestamp;
 				}
 				else {
-					throw new Error(this.constructor.name + ' createdTimestamp must be a timestamp.');
+					throw new Error(this.constructor.name + ' createdDate must be a valid date.');
 				}
 			}
 			else {
-				throw new Error(this.constructor.name + ' must have a createdTimestamp.');
+				throw new Error(this.constructor.name + ' must have a createdDate.');
 			}
 		}
 		catch (error) {
 			throw error;
 		}
 	}
-	get createdTimestamp() {
-		return this.data.createdTimestamp;
+	get createdDate() {
+		return this.data.createdDate;
 	}
 };
 
-module.exports = EmojiObject;
+module.exports = EmojiDocument;

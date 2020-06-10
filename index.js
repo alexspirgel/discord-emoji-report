@@ -5,16 +5,21 @@ const emojiRegex = require('emoji-regex');
 const nodeEmoji = require('node-emoji');
 
 const DateHelpers = require('./classes/DateHelpers');
-const EmojiObject = require('./classes/EmojiObject');
+const EmojiCollectionInfoDocument = require('./classes/EmojiCollectionInfoDocument');
+const EmojiDocument = require('./classes/EmojiDocument');
 
-const generateEmojiReportStocks = async (parameters) => {
+/*
+*/
 
-	const textChannels = getTextChannelsFromLocations(parameters.locations);
-	// console.log(textChannels);
-	
-	const guildEmojis = getGuildEmojis(parameters.message.channel.guild);
-	// console.log(guildEmojis);
-};
+const generateTextChannelCollectionName = (guildId, textChannelId) => {
+	return 'guild:' + guildId + '_channel:' + textChannelId;
+}
+const generateEmojiCollectionName = (guildId, textChannelId, year, month, day) => {
+	return 'guild:' + guildId + '_channel:' + textChannelId + '_date:' + year + '-' + month + '-' + day;
+}
+
+/*
+*/
 
 const isGuild = (guild) => {
 	try {
@@ -25,6 +30,9 @@ const isGuild = (guild) => {
 	catch (error) {}
 	return false;
 };
+const getClientGuildById = (client, guildId) => {
+	return client.guilds.cache.get(guildId);
+};
 
 const isTextChannel = (textChannel) => {
 	try {
@@ -34,6 +42,153 @@ const isTextChannel = (textChannel) => {
 	}
 	catch (error) {}
 	return false;
+};
+const getGuildChannelById = (guild, channelId) => {
+	return guild.channels.cache.get(channelId);
+};
+
+const isGuildMember = (guildMember) => {
+	try {
+		if (guild.constructor.name === 'GuildMember') {
+			return true;
+		}
+	}
+	catch (error) {}
+	return false;
+};
+const getGuildMemberById = (guild, userId) => {
+	return guild.members.fetch(userId);
+};
+
+/*
+*/
+
+const runMongoClientCommands = async (mongoClientCommands) => {
+	const mongoConnectionUrl = 'mongodb://localhost:27017';
+	const mongoConnectionOptions = {
+		useUnifiedTopology: true
+	};
+	const logErrorCallback = (error) => {
+		if (error) {
+			console.error(error);
+		}
+	};
+	const mongoClient = await new MongoClient(mongoConnectionUrl, mongoConnectionOptions, logErrorCallback).connect();
+	console.log('Connected to ' + mongoConnectionUrl);
+	const returnValue = await mongoClientCommands(mongoClient);
+	mongoClient.close();
+	console.log('Closed connection to ' + mongoConnectionUrl);
+	return returnValue;
+};
+
+const runMongoDatabaseCommands = async (mongoDatabaseCommands) => {
+	const databaseName = 'discordEmojiReport';
+	const returnValue = await runMongoClientCommands(async (mongoClient) => {
+		const database = mongoClient.db(databaseName);
+		console.log('Using database: ' + databaseName);
+		const returnValue = await mongoDatabaseCommands(database);
+		return returnValue;
+	});
+	return returnValue;
+};
+
+const getTextChannelDatabaseCollectionDocuments = async (guildId, textChannelId, query = {}) => {
+	const collectionName = generateTextChannelCollectionName(guildId, textChannelId);
+	const results = await runMongoDatabaseCommands(async (database) => {
+		const collection = await database.collection(collectionName);
+		return await collection.find(query).toArray();
+	});
+	return results;
+};
+
+const setTextChannelDatabaseCollectionDocuments = async (guildId, textChannelId, emojiCollectionInfoDocuments) => {
+	if (!Array.isArray(emojiCollectionInfoDocuments)) {
+		emojiCollectionInfoDocuments = [emojiCollectionInfoDocuments];
+	}
+	let emojiCollectionInfoDocument;
+	for (emojiCollectionInfoDocument of emojiCollectionInfoDocuments) {
+		if (!EmojiCollectionInfoDocument.isInstanceOfSelf(emojiCollectionInfoDocument)) {
+			throw new Error('emojiCollectionInfoDocuments must only contain instances of the EmojiCollectionInfoDocument class.');
+		}
+		if (emojiCollectionInfoDocument.guildId !== guildId || emojiCollectionInfoDocument.channelId !== textChannelId) {
+			throw new Error('emojiCollectionInfoDocuments guildId & channelId must matched those passed as parameters.');
+		}
+	}
+	const collectionName = generateTextChannelCollectionName(guildId, textChannelId);
+	await runMongoDatabaseCommands(async (database) => {
+		const collection = await database.collection(collectionName);
+		for (let emojiCollectionInfoDocument of emojiCollectionInfoDocuments) {
+			await collection.updateOne({
+				name: emojiCollectionInfoDocument.name
+			},
+			{
+				$set: {
+					name: emojiCollectionInfoDocument.name,
+					guildId: emojiCollectionInfoDocument.guildId,
+					channelId: emojiCollectionInfoDocument.channelId,
+					date: emojiCollectionInfoDocument.date,
+					cachedDate: emojiCollectionInfoDocument.cachedDate,
+					cachedComplete: emojiCollectionInfoDocument.cachedComplete
+				}
+			},
+			{
+				upsert: true
+			});
+		}
+	});
+};
+
+const getEmojiDatabaseCollectionDocuments = async (guildId, textChannelId, date, query = {}) => {
+	const dateSegments = DateHelpers.getDateSegments(date);
+	const collectionName = generateEmojiCollectionName(guildId, textChannelId, dateSegments.year, dateSegments.month, dateSegments.day);
+	const results = await runMongoDatabaseCommands(async (database) => {
+		const collection = await database.collection(collectionName);
+		return await collection.find(query).toArray();
+	});
+	return results;
+};
+
+const setEmojiDatabaseCollectionDocuments = async (guildId, textChannelId, date, emojiDocuments) => {
+	if (!Array.isArray(emojiDocuments)) {
+		emojiDocuments = [emojiDocuments];
+	}
+	let emojiDocument;
+	for (emojiDocument of emojiDocuments) {
+		if (!EmojiDocument.isInstanceOfSelf(emojiDocument)) {
+			throw new Error('emojiDocuments must only contain instances of the EmojiDocument class.');
+		}
+		if (emojiDocument.guildId !== guildId || emojiDocument.channelId !== textChannelId) {
+			throw new Error('emojiDocuments guildId & channelId must matched those passed as parameters.');
+		}
+	}
+	const dateSegments = DateHelpers.getDateSegments(date);
+	const collectionName = generateEmojiCollectionName(guildId, textChannelId, dateSegments.year, dateSegments.month, dateSegments.day);
+	await runMongoDatabaseCommands(async (database) => {
+		const collection = await database.collection(collectionName);
+		await collection.deleteMany({});
+		await collection.insertMany(emojiDocuments);
+	});
+};
+
+/*
+*/
+
+const generateEmojiReportStocks = async (parameters) => {
+	const dayDate1Minimum = DateHelpers.getDateWithoutTime(parameters.date1Minimum);
+	const dayDate1Maximum = DateHelpers.getDateWithoutTime(parameters.date1Maximum);
+	const dayDate2Minimum = DateHelpers.getDateWithoutTime(parameters.date2Minimum);
+	const dayDate2Maximum = DateHelpers.getDateWithoutTime(parameters.date2Maximum);
+	const range1DayDates = DateHelpers.getDayDatesFromRange(dayDate1Minimum, dayDate1Maximum);
+	const range2DayDates = DateHelpers.getDayDatesFromRange(dayDate2Minimum, dayDate2Maximum);
+
+	const textChannels = getTextChannelsFromLocations(parameters.locations);
+	
+	const range1GuildEmojiCount = getGuildEmojis(parameters.message.channel.guild);
+	const range2GuildEmojiCount = getGuildEmojis(parameters.message.channel.guild);
+
+	let textChannel;
+	for (textChannel of textChannels) {
+	}
 };
 
 const getTextChannelsFromLocations = (locationObjects) => {
@@ -91,232 +246,168 @@ const getGuildEmojis = (guild) => {
 	return emoji;
 };
 
-/**
- * Database
- */
-
-const runMongoClientCommands = async (mongoClientCommands) => {
-	const mongoConnectionUrl = 'mongodb://localhost:27017';
-	const mongoConnectionOptions = {
-		useUnifiedTopology: true
-	};
-	const logErrorCallback = (error) => {
-		if (error) {
-			console.error(error);
-		}
-	};
-	const mongoClient = await new MongoClient(mongoConnectionUrl, mongoConnectionOptions, logErrorCallback).connect();
-	console.log('Connected to ' + mongoConnectionUrl);
-	const returnValue = await mongoClientCommands(mongoClient);
-	mongoClient.close();
-	console.log('Closed connection to ' + mongoConnectionUrl);
-	return returnValue;
-};
-
-const runMongoDatabaseCommands = async (mongoDatabaseCommands) => {
-	const databaseName = 'discordEmojiReport';
-	const returnValue = await runMongoClientCommands(async (mongoClient) => {
-		const database = mongoClient.db(databaseName);
-		console.log('Using database: ' + databaseName);
-		const returnValue = await mongoDatabaseCommands(database);
-		return returnValue;
+const getGuildBotMemberIds = (guild) => {
+	const botMembers = guild.members.cache.filter((member) => {
+		return member.user.bot;
 	});
-	return returnValue;
-};
-
-const generateGuildDatabaseCollectionName = (guild) => {
-	return 'guild-' + guild.id;
-};
-
-const addGuildDatabaseCollection = async (guild) => {
-	const guildDatabaseCollection = new GuildDatabaseCollection(guild);
-	await updateGuildDatabaseCollection(guild, guildDatabaseCollection.data);
-};
-
-const getGuildDatabaseCollection = async (guild) => {
-	const guildDatabaseCollectionName = generateGuildDatabaseCollectionName(guild);
-	const collectionValues = await runMongoDatabaseCommands(async (database) => {
-		const collection = await database.collection(guildDatabaseCollectionName);
-		const collectionValues = await collection.findOne({});
-		return collectionValues;
+	const botMemberIds = botMembers.map((member) => {
+		return member.user.id;
 	});
-	return collectionValues;
-};
-
-const updateGuildDatabaseCollection = async (guild, data) => {
-	const guildDatabaseCollectionName = generateGuildDatabaseCollectionName(guild);
-	const collectionValues = await runMongoDatabaseCommands(async (database) => {
-		const collection = await database.collection(guildDatabaseCollectionName);
-		await collection.deleteMany({});
-		await collection.insertOne(data);
-	});
-	return collectionValues;
-};
-
-/**
- * 
- */
-
-const isEmojiCollectionCacheFresh = async (client, emojiCollectionInfoObject) => {
-	const channel = client.channels.cache.get(emojiCollectionInfoObject.channelId);
-	const thresholdMessage = await getMostRecentTextChannelMessage(channel, 100);
-	/*
-	- Any emoji created more recently than the 100th most recent message in the channel, is stale.
-	- Any emoji created within the last 2 days, is stale.
-	- Any emoji created more than 30 days ago that haven't been cached at least 30 days after it's creation, is stale.
-			- ^ this one is a bit tricky, it ensures emoji that have been cached 30 days after their creation will never be stale again. Meaning they would only be recached manually at that point if needed.
-	*/
-};
-
-const getMostRecentTextChannelMessage = async (textChannel, offset) => {
-	
-	const mostRecentMessage = await textChannel.messages.fetch(textChannel.lastMessageID);
-	
-	if (offset === undefined || offset === 0) {
-		return mostRecentMessage;
-	}
-	
-	const batchSize = 100;
-	let batchCount;
-	let targetBatchCount = (Math.floor((offset - 1) / batchSize) + 1);
-	let offsetRelativeToBatch = offset % batchSize;
-	if (offsetRelativeToBatch === 0) {
-		offsetRelativeToBatch = batchSize;
-	}
-	
-	let messageBatch;
-	let oldestMessageIdInBatch;
-
-	for (batchCount = 0; batchCount < targetBatchCount; batchCount++) {
-		if (batchCount === 0) {
-			oldestMessageIdInBatch = mostRecentMessage;
-		}
-		else {
-			oldestMessageIdInBatch = messageBatch.last();
-		}
-		// Get next batch.
-		messageBatch = await textChannel.messages.fetch({
-			before: oldestMessageIdInBatch.id,
-			limit: batchSize
-		});
-		// Sort by most recent first because the default order is unreliable.
-		messageBatch.sort((messageA, messageB) => {
-			return messageB.createdTimestamp - messageA.createdTimestamp
-		});
-	}
-	
-	const messageBatchArray = messageBatch.array();
-	return messageBatchArray[offsetRelativeToBatch - 1];
+	return botMemberIds;
 };
 
 /*
-const getFullDaysWithinDateRange = (dateMin, dateMax) => {
-	const addOneDayToDate = (date) => {
-		return new Date(new Date(date).setDate(date.getDate() + 1));
-	};
-	const daysWithin = [];
-	dateMin = new Date(dateMin);
-	dateMax = new Date(dateMax);
-	let dayStart = new Date(new Date(dateMin).setHours(0,0,0,0));
-	let dayEnd = new Date(new Date(dayStart).setDate(dayStart.getDate() + 1));
-	while (dayStart < dateMax) {
-		if (dayStart >= dateMin && dayStart <= dateMax &&
-		dayEnd >= dateMin && dayEnd <= dateMax) {
-			daysWithin.push(dayStart);
-		}
-		dayStart = addOneDayToDate(dayStart);
-		dayEnd = addOneDayToDate(dayEnd);
+*/
+
+/*
+- Any emoji created more recently than the 100th most recent message in the channel, is stale.
+- Any emoji created within the last 2 days, is stale.
+- Any emoji created more than 15 days ago that haven't been cached at least 15 days after it's creation, is stale.
+*/
+const isEmojiCollectionCacheStale = async (client, emojiCollectionInfoDocument) => {
+	const channel = client.channels.cache.get(emojiCollectionInfoDocument.channelId);
+	
+	const recentMessageThresholdCount = 100;
+	const recentMessageThreshold = await getMostRecentTextChannelMessageFromDateRange(channel, 0, Date.now(), (-1 * recentMessageThresholdCount));
+	const recentMessageThresholdDate = new Date(recentMessageThreshold.createdTimestamp);
+	const recentDateThresholdDays = -2;
+	const recentDateThresholdDate = DateHelpers.addDaysToDate(Date.now(), recentDateThresholdDays);
+	if (emojiCollectionInfoDocument.date > recentMessageThresholdDate || emojiCollectionInfoDocument.date > recentDateThresholdDate) {
+		return true;
 	}
-	return daysWithin;
+
+	const archiveDateThresholdDays = -15;
+	const archiveDateThreshold = DateHelpers.addDaysToDate(Date.now(), archiveDateThresholdDays);
+	const archiveCacheDateThresholdDays = 15;
+	const archiveCacheDateThreshold = DateHelpers.addDaysToDate(emojiCollectionInfoDocument.date, archiveCacheDateThresholdDays);
+
+	if (emojiCollectionInfoDocument.date < archiveDateThreshold && emojiCollectionInfoDocument.cachedDate < archiveCacheDateThreshold) {
+		return true;
+	}
+
+	return false;
 };
 
-const getMostRecentTextChannelMessageFromDateRange = async (textChannel, dateMin, dateMax) => {
-	const targetDateMin = new Date(dateMin);
-	const targetDateMax = new Date(dateMax);
+const getMostRecentTextChannelMessageFromDateRange = async (textChannel, dateMinimum, dateMaximum, offset = 0) => {
 
-	let messageBatch;
-	let messageMatch;
-	let messageMatchOlder;
-	let message;
-	message = await textChannel.messages.fetch(textChannel.lastMessageID);
-
-	// const dateRangeMaxNextDay = addDayToDate(dateMax);
-	// // If the date range maximum is less than a day away.
-	// if (dateRangeMaxNextDay > Date.now()) {
-	// 	// Start looking at the most recent message in the channel.
-	// 	message = await textChannel.messages.fetch(textChannel.lastMessageID);
-	// }
-	// // If the date range maximum is further than a day away.
-	// else {
-	// 	textChannel.messages.cache.filter((message) => {
-	// 		return isDateWithinRange(dateMin, dateMax, message.createdTimestamp);
-	// 	});
-		
-	// }
-
-	if (message.createdTimestamp >= targetDateMin && message.createdTimestamp <= targetDateMax) {
-		messageMatch = message;
+	if (offset < -100 || offset > 100) {
+		throw new Error('offset cannot be larger than 100.');
 	}
+	
+	const targetDateMinimum = new Date(dateMinimum);
+	const targetDateMaximum = new Date(dateMaximum);
+	
+	const isMessageWithinRange = (message) => {
+		if (message.createdTimestamp >= targetDateMinimum && message.createdTimestamp <= targetDateMaximum) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	};
 
-	const messageBatchSize = 100;
-	let batchCount = 0;
-	messageBatch = await textChannel.messages.fetch({
-		before: message.id,
-		limit: messageBatchSize
-	});
+	const batchSize = 100;
+	let batch;
+	let match;
+	let matchOlder;
+	const mostRecentMessage = await textChannel.messages.fetch(textChannel.lastMessageID);
+	if (isMessageWithinRange(mostRecentMessage)) {
+		match = mostRecentMessage;
+	}
+	let lastMessageId = mostRecentMessage.id;
 
-	while (!messageMatch) {
-		batchCount++;
-		// Sort by most recent first because the default order is unreliable.
-		messageBatch.sort((messageA, messageB) => {
+	while (!match) {
+		// Get next batch of messages.
+		batch = await textChannel.messages.fetch({
+			before: lastMessageId,
+			limit: batchSize
+		});
+		// Sort by most recent first.
+		batch.sort((messageA, messageB) => {
 			return messageB.createdTimestamp - messageA.createdTimestamp
 		});
 		// Find the most recent message from the target date range.
-		messageMatch = messageBatch.find((message) => {
-			if (message.createdTimestamp >= targetDateMin && message.createdTimestamp <= targetDateMax) {
-				return true;
-			}
-		});
-		if (!messageMatch) {
+		match = batch.find(isMessageWithinRange);
+		if (!match) {
 			// Find any message created before the target date range.
-			messageMatchOlder = messageBatch.find((message) => {
-				if (new Date(message.createdTimestamp) < targetDateMin) {
+			matchOlder = batch.find((message) => {
+				if (new Date(message.createdTimestamp) < targetDateMinimum) {
 					return true;
 				}
 			});
-			if (messageMatchOlder) {
-				messageMatch = null;
+			if (matchOlder) {
+				break;
 			}
-			else {
-				messageBatch = await textChannel.messages.fetch({
-					before: messageBatch.last().id,
-					limit: messageBatchSize
-				});
-			}
+		}
+
+		lastMessageId = batch.last().id;
+	}
+
+	if (match) {
+		let offsetBatch;
+		if (offset === 0) {
+			return match;
+		}
+		else if (offset > 0) {
+			offsetBatch = await textChannel.messages.fetch({
+				after: match.id,
+				limit: offset
+			});
+			// Sort by oldest first.
+			offsetBatch.sort((messageA, messageB) => {
+				return messageA.createdTimestamp - messageB.createdTimestamp
+			});
+		}
+		else if (offset < 0) {
+			offsetBatch = await textChannel.messages.fetch({
+				before: match.id,
+				limit: Math.abs(offset)
+			});
+			// Sort by most recent first.
+			offsetBatch.sort((messageA, messageB) => {
+				return messageB.createdTimestamp - messageA.createdTimestamp
+			});
+		}
+		const offsetMatch = offsetBatch.last();
+		if (offsetMatch) {
+			return offsetMatch;
 		}
 	}
 
-	return messageMatch;
+	return match;
 };
 
-const getTextChannelEmojisFromDateRange = async (textChannel, dateMin, dateMax) => {
-	const fullDaysToCache = getFullDaysWithinDateRange(dateMin, dateMax);
-	const targetDateMin = new Date(dateMin);
-	const targetDateMax = new Date(dateMax);
-	console.log(`Getting emojis in channel ${textChannel.name} from between dates ${targetDateMin} and ${targetDateMax}.`);
+const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateMaximum, debug = false) => {
 	let emojis = [];
-	const mostRecentMessageFromDateRange = await getMostRecentTextChannelMessageFromDateRange(textChannel, dateMin, dateMax);
+	const targetDateMinimum = new Date(dateMinimum);
+	const targetDateMaximum = new Date(dateMaximum);
+	
+	if (debug) {
+		console.log(`Fetching emojis in channel ${textChannel.name} from between dates ${targetDateMinimum} and ${targetDateMaximum}.`);
+	}
+
+	const botMemberIds = getGuildBotMemberIds(textChannel.guild);
+
+	const mostRecentMessageFromDateRange = await getMostRecentTextChannelMessageFromDateRange(textChannel, targetDateMinimum, targetDateMaximum);
 	let message = mostRecentMessageFromDateRange;
 	let count = 0;
+
 	while (message) {
-		if (!message.author.bot) {
-			count++;
+		count++;
+
+		if (debug) {
 			process.stdout.clearLine();
 			process.stdout.cursorTo(0);
-			process.stdout.write("Gathering emojis from " + count + " messages.");
-			let messageEmojis = await getEmojisFromMessage(message);
-			emojis = emojis.concat(messageEmojis);
+			process.stdout.write(`Crawling ${count} messages...`);
 		}
+
+		let messageEmojis = await getEmojisFromMessage(message);
+		// Remove emojis added by bots.
+		messageEmojis = messageEmojis.filter((emoji) => {
+			return !(botMemberIds.includes(emoji.userId));
+		});
+		emojis = emojis.concat(messageEmojis);
+
 		let previousMessage = await textChannel.messages.fetch({
 			before: message.id,
 			limit: 1
@@ -324,24 +415,23 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMin, dateMax) 
 		message = null;
 		previousMessage = previousMessage.first();
 		if (previousMessage) {
-			previousMessageCreatedDate = new Date(previousMessage.createdTimestamp);
-			if (previousMessageCreatedDate >= targetDateMin && previousMessageCreatedDate <= targetDateMax) {
+			const previousMessageCreatedDate = new Date(previousMessage.createdTimestamp);
+			if (previousMessageCreatedDate >= targetDateMinimum && previousMessageCreatedDate <= targetDateMaximum) {
 				message = previousMessage;
 			}
 		}
 	}
-	process.stdout.clearLine();
-	process.stdout.cursorTo(0);
-	process.stdout.write("Completed gathering emojis from " + count + " messages.");
-	process.stdout.write("\n");
-	cacheDaysOfEmoji(fullDaysToCache, emojis);
+
+	if (debug) {
+		process.stdout.clearLine();
+		process.stdout.cursorTo(0);
+		process.stdout.write(`Crawled ${count} messages.`);
+		process.stdout.write("\n");
+	}
+
 	return emojis;
 }
 
-const cacheDaysOfEmoji = (daysToCache, emojis) => {
-	console.log('daysToCache:', daysToCache);
-	console.log('emojis:', emojis);
-};
 
 const getEmojisFromMessage = async (message) => {
 	const emojis = [];
@@ -449,6 +539,8 @@ const getUnicodeEmojiStringsFromString = (string) => {
 	}
 	return matches;
 };
+
+/*
 */
 
 const discordClient = new Discord.Client();
@@ -468,17 +560,17 @@ discordClient.on("ready", async () => {
 	
 	const hiveGuildId = '231204322145337344';
 	const hiveGuild = discordClient.guilds.cache.get(hiveGuildId);
+	const generalChannelId = '231204322145337344';
+	const generalChannel = hiveGuild.channels.cache.get(generalChannelId);
 	const botChannelId = '718193008939368499';
 	const botChannel = hiveGuild.channels.cache.get(botChannelId);
+	const voiceChannelId = '231204322145337345';
+	const voiceChannel = hiveGuild.channels.cache.get(voiceChannelId);
 	
 	const spirgelsGuildId = '717413056086278196';
 	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
 	const testChannelId = '717428158609096764';
-	const testChannel = hiveGuild.channels.cache.get(testChannelId);
-
-	// await addGuildDatabaseCollection(hiveGuild);
-	// await updateGuildDatabaseCollection(hiveGuild, {abc:123});
-	// console.log(await getGuildDatabaseCollection(hiveGuild));
+	const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
 });
 
 discordClient.on("message", async (message) => {
@@ -508,10 +600,10 @@ discordClient.on("message", async (message) => {
 						type: 'guild',
 						location: message.channel.guild
 					},
-					compare1DateDayMin: date30DaysPast,
-					compare1DateDayMax: dateNow,
-					compare2DateDayMin: date60DaysPast,
-					compare2DateDayMax: date30DaysPast
+					date1Minimum: date30DaysPast,
+					date1Maximum: dateNow,
+					date2Minimum: date60DaysPast,
+					date2Maximum: date30DaysPast
 				});
 			}
 			catch (error) {
