@@ -1,5 +1,6 @@
 /*
 {
+	collectionInfo: false,
 	name = 'name',
 	string = '<:name:123456789>', // or unicode emoji string
 	type = 'custom', // or 'unicode'
@@ -23,7 +24,9 @@ const EmojiDocument = class {
 	}
 	constructor(data, validate = false) {
 		if (validate) {
-			this.data = {};
+			this.data = {
+				collectionInfo: false
+			};
 			this.name = data.name;
 			this.string = data.string;
 			this.type = data.type;

@@ -1,17 +1,24 @@
 const DateHelpers = class {
 	static addDaysToDate(date, days) {
 		date = new Date(date);
-		let newDate = new Date(new Date(date).setDate(date.getDate() + days));
-		return newDate;
+		return new Date(new Date(date).setDate(date.getDate() + days));
 	}
-	static isDateToday(date) {
+	static addMillisecondsToDate(date, milliseconds) {
+		date = new Date(date);
+		return new Date((date.getTime()) + milliseconds);
+	}
+	static getDateDayMaximumDate(date) {
+		const dateNextDay = this.addDaysToDate(date, 1);
+		return this.addMillisecondsToDate(dateNextDay, -1);
+	}
+	static isDateDayInThePast(date) {
 		const day = new Date(date).setHours(0,0,0,0);
 		const today = new Date(Date.now()).setHours(0,0,0,0);
-		if (day == today) {
-			return true;
+		if (day >= today) {
+			return false;
 		}
 		else {
-			return false;
+			return true;
 		}
 	}
 	static getDateWithoutTime(date) {
@@ -36,7 +43,7 @@ const DateHelpers = class {
 			day: this.getDateDay(date)
 		};
 	}
-	static isDateWithinRange (date, dateMinimum, dateMaximum) {
+	static isDateWithinRange(date, dateMinimum, dateMaximum) {
 		dateMinimum = new Date(dateMinimum);
 		dateMaximum = new Date(dateMaximum);
 		date = new Date(date);
@@ -47,7 +54,7 @@ const DateHelpers = class {
 			return false;
 		}
 	};
-	static getDayDatesFromRange(dateMinimum, dateMaximum) {
+	static getDateDaysFromRange(dateMinimum, dateMaximum) {
 		const dateDayMinimum = this.getDateWithoutTime(dateMinimum);
 		const dateDayMaximum = this.getDateWithoutTime(dateMaximum);
 		const dayDates = [];

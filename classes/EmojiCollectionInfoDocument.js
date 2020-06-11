@@ -1,5 +1,6 @@
 /*
 {
+	collectionInfo: true,
 	name: 'guild:123456789_channel:123456789_date:2020-1-21',
 	guildId: '123456789',
 	channelId: '123456789',
@@ -20,7 +21,9 @@ const EmojiCollectionInfoDocument = class {
 	}
 	constructor(data, validate = false) {
 		if (validate) {
-			this.data = {};
+			this.data = {
+				collectionInfo: true
+			};
 			this.name = data.name;
 			this.guildId = data.guildId;
 			this.channelId = data.channelId;
