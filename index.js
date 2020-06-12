@@ -76,37 +76,11 @@ const runMongoDatabaseCommands = async (mongoDatabaseCommands) => {
 	return returnValue;
 };
 
-const getEmojiDatabaseCollectionDocuments = async (guildId, textChannelId, date, query = {}) => {
-	const dateSegments = DateHelpers.getDateSegments(date);
-	const collectionName = generateEmojiCollectionName(guildId, textChannelId, dateSegments.year, dateSegments.month, dateSegments.day);
-	const results = await runMongoDatabaseCommands(async (database) => {
-		const collection = await database.collection(collectionName);
-		return await collection.find(query).toArray();
-	});
-	return results;
-};
+/*
+*/
 
-const setEmojiDatabaseCollectionDocuments = async (guildId, textChannelId, date, emojiDocuments) => {
-	if (!Array.isArray(emojiDocuments)) {
-		emojiDocuments = [emojiDocuments];
-	}
-	let emojiDocument;
-	for (emojiDocument of emojiDocuments) {
-		if (!EmojiDocument.isInstanceOfSelf(emojiDocument)) {
-			throw new Error('emojiDocuments must only contain instances of the EmojiDocument class.');
-		}
-		if (emojiDocument.guildId !== guildId || emojiDocument.channelId !== textChannelId) {
-			throw new Error('emojiDocuments guildId & channelId must matched those passed as parameters.');
-		}
-	}
-	const dateSegments = DateHelpers.getDateSegments(date);
-	const collectionName = generateEmojiCollectionName(guildId, textChannelId, dateSegments.year, dateSegments.month, dateSegments.day);
-	await runMongoDatabaseCommands(async (database) => {
-		const collection = await database.collection(collectionName);
-		await collection.deleteMany({});
-		await collection.insertMany(emojiDocuments);
-	});
-};
+const databaseGetEmojiCollectionInfoDocument = async (collection) => {};
+const databaseGetEmojiDocuments = async (collection) => {};
 
 /*
 */
@@ -218,9 +192,7 @@ const getGuildEmojis = (guild) => {
 	return emoji;
 };
 
-const isEmojiCollectionCacheStale = async (client, emojiCollectionInfoDocument) => {
-	const channel = client.channels.cache.get(emojiCollectionInfoDocument.channelId);
-	
+const isEmojiCollectionCacheStale = async (channel, emojiCollectionInfoDocument) => {
 	const recentMessageThresholdCount = 100;
 	const recentMessageThreshold = await getMostRecentTextChannelMessageFromDateRange(channel, 0, Date.now(), (-1 * recentMessageThresholdCount));
 	const recentMessageThresholdDate = new Date(recentMessageThreshold.createdTimestamp);
@@ -380,7 +352,7 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 	let emojis = [];
 	const dateRangeDays = DateHelpers.getDateDaysFromRange(dateMinimum, dateMaximum);
 	let dateRangeDay;
-	runMongoDatabaseCommands(async (database) => {
+	await runMongoDatabaseCommands(async (database) => {
 		for (dateRangeDay of dateRangeDays) {
 			const dateSegments = DateHelpers.getDateSegments(dateRangeDay);
 			const emojiCollectionName = generateEmojiCollectionName(textChannel.guild.id, textChannel.id, dateSegments.year, dateSegments.month, dateSegments.day);
@@ -388,12 +360,15 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 			let collectionInfoDocument = await collection.findOne({collectionInfo: true});
 			// Try using cached values.
 			if (collectionInfoDocument) {
-				const emojiCollectionCacheStale = await isEmojiCollectionCacheStale(collectionInfoDocument);
+				const emojiCollectionCacheStale = await isEmojiCollectionCacheStale(textChannel, collectionInfoDocument);
 				if (!emojiCollectionCacheStale) {
 					if (debug) {
 						console.log(`Channel '${textChannel.name}' date '${dateRangeDay}' emoji cache is fresh.`);
 					}
-					const emojiDocuments = await collection.find({collectionInfo: false});
+					let emojiDocuments = await collection.find({collectionInfo: false}).toArray();
+					emojiDocuments = emojiDocuments.map((currentValue) => {
+						return new EmojiDocument(currentValue);
+					})
 					emojis = emojis.concat(emojiDocuments);
 					continue;
 				}
@@ -405,7 +380,6 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 			await collection.deleteMany({});
 			const crawledEmojis = await crawlTextChannelEmojisFromDateRange(textChannel, dateRangeDay, DateHelpers.getDateDayMaximumDate(dateRangeDay), debug);
 			if (crawledEmojis.length) {
-				await collection.insertMany(crawledEmojis);
 				collectionInfoDocument = new EmojiCollectionInfoDocument({
 					name: emojiCollectionName,
 					guildId: textChannel.guild.id,
@@ -414,8 +388,15 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 					cachedDate: Date.now(),
 					cacheComplete: DateHelpers.isDateDayInThePast(dateRangeDay)
 				}, true);
-				await collection.insertOne(collectionInfoDocument);
+				await collection.insertOne(collectionInfoDocument.data);
+				collectionInfoDocument = await collection.findOne({collectionInfo: true});
+				await collection.insertMany(crawledEmojis.map((currentValue) => {
+					return currentValue.data;
+				}));
 				emojis = emojis.concat(crawledEmojis);
+				//
+				let emojiDocuments = await collection.find({collectionInfo: false}).toArray();
+				//
 			}
 		}
 	});
@@ -433,12 +414,12 @@ const getEmojisFromMessage = async (message) => {
 				string: customEmoji.string,
 				type: 'custom',
 				usage: 'content',
-				guild: message.channel.guild.id,
-				channel: message.channel.id,
+				guildId: message.channel.guild.id,
+				channelId: message.channel.id,
 				messageId: message.id,
 				userId: message.author.id,
 				createdDate: message.createdTimestamp
-			});
+			}, true);
 			emojis.push(emojiDocument);
 		}
 
@@ -449,12 +430,12 @@ const getEmojisFromMessage = async (message) => {
 				string: unicodeEmoji.string,
 				type: 'unicode',
 				usage: 'content',
-				guild: message.channel.guild.id,
-				channel: message.channel.id,
+				guildId: message.channel.guild.id,
+				channelId: message.channel.id,
 				messageId: message.id,
 				userId: message.author.id,
 				createdDate: message.createdTimestamp
-			});
+			}, true);
 			emojis.push(emojiDocument);
 		}
 	}
@@ -468,8 +449,8 @@ const getEmojisFromMessage = async (message) => {
 					string: '',
 					type: '',
 					usage: 'reaction',
-					guild: message.channel.guild.id,
-					channel: message.channel.id,
+					guildId: message.channel.guild.id,
+					channelId: message.channel.id,
 					messageId: message.id,
 					userId: user.id,
 					createdDate: message.createdTimestamp
@@ -485,7 +466,7 @@ const getEmojisFromMessage = async (message) => {
 					emojiObject.string = unicodeEmoji[0].string;
 					emojiObject.type = 'unicode';
 				}
-				emojiObject = new EmojiDocument(emojiObject);
+				emojiObject = new EmojiDocument(emojiObject, true);
 				emojis.push(emojiObject);
 			}
 		}
@@ -587,10 +568,6 @@ discordClient.on("message", async (message) => {
 		else if (message.content.includes("!emoji-report stocks") || message.content.includes("!emoji-report stoncks")) {
 			message.channel.send("Generating stocks report. This may take a while, I'll tag you when it's ready.");
 			try {
-				const spirgelsGuildId = '717413056086278196';
-				const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
-				const testChannelId = '717428158609096764';
-				const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
 				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
 				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -2);
 				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -12);
