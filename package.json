@@ -12,7 +12,6 @@
 		"dotenv": "^8.2.0",
 		"emoji-regex": "^9.0.0",
 		"fs": "0.0.1-security",
-		"mongodb": "^3.5.8",
-		"node-emoji": "^1.10.0"
+		"mongodb": "^3.5.8"
 	}
 }

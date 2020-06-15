@@ -147,6 +147,22 @@ const EmojiCollectionInfoDocument = class {
 	get cachedDate() {
 		return this.data.cachedDate;
 	}
+	set cacheComplete(cacheComplete) {
+		try {
+			if (typeof cacheComplete === 'boolean') {
+				this.data.cacheComplete = cacheComplete;
+			}
+			else {
+				throw new Error(this.constructor.name + ' must have a cacheComplete boolean value.');
+			}
+		}
+		catch (error) {
+			throw error;
+		}
+	}
+	get cacheComplete() {
+		return this.data.cacheComplete;
+	}
 };
 
 module.exports = EmojiCollectionInfoDocument;

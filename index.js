@@ -2,7 +2,6 @@ require('dotenv').config();
 const MongoClient = require('mongodb').MongoClient;
 const Discord = require('discord.js');
 const emojiRegex = require('emoji-regex');
-const nodeEmoji = require('node-emoji');
 
 const DateHelpers = require('./classes/DateHelpers');
 const EmojiCollectionInfoDocument = require('./classes/EmojiCollectionInfoDocument');
@@ -106,42 +105,50 @@ const generateEmojiReportStocks = async (parameters) => {
 
 	const textChannels = getTextChannelsFromLocations(parameters.locations);
 
-	const emojiPromises = [];
+	let emojis = [];
 	let textChannel;
 	for (textChannel of textChannels) {
 		if (combinedDatesMinimum && combinedDatesMaximum) {
-			emojiPromises.push({
-				channel: textChannel,
-				dateMinimum: combinedDatesMinimum,
-				dateMaximum: combinedDatesMaximum,
-				promise: getTextChannelEmojisFromDateRange(textChannel, combinedDatesMinimum, combinedDatesMaximum, parameters.debug)
-			});
+			let emojiResultCombined = await getTextChannelEmojisFromDateRange(textChannel, combinedDatesMinimum, combinedDatesMaximum, parameters.debug);
+			if (emojiResultCombined) {
+				emojis = emojis.concat(emojiResultCombined);
+			}
 		}
 		else {
-			emojiPromises.push({
-				channel: textChannel,
-				dateMinimum: parameters.date1Minimum,
-				dateMaximum: parameters.date1Maximum,
-				promise: getTextChannelEmojisFromDateRange(textChannel, parameters.date1Minimum, parameters.date1Maximum, parameters.debug)
-			});
-			emojiPromises.push({
-				channel: textChannel,
-				dateMinimum: parameters.date2Minimum,
-				dateMaximum: parameters.date2Maximum,
-				promise: getTextChannelEmojisFromDateRange(textChannel, parameters.date2Minimum, parameters.date2Maximum, parameters.debug)
-			});
+			let emojiResultRange1 = await getTextChannelEmojisFromDateRange(textChannel, parameters.date1Minimum, parameters.date1Maximum, parameters.debug);
+			if (emojiResultRange1) {
+				emojis = emojis.concat(emojiResultRange1);
+			}
+
+			let emojiResultRange2 = await getTextChannelEmojisFromDateRange(textChannel, parameters.date2Minimum, parameters.date2Maximum, parameters.debug);
+			if (emojiResultRange2) {
+				emojis = emojis.concat(emojiResultRange2);
+			}
 		}
 	}
 
-	let emoji = [];
-	// resolve promises, add emoji to one giant array
-	for (emojiPromise of emojiPromises) {}
-
+	/*
+	CREATE CLASS FOR THESE ARRAYS?
+	*/
 	const range1GuildEmojis = getGuildEmojis(parameters.message.channel.guild);
 	const range2GuildEmojis = getGuildEmojis(parameters.message.channel.guild);
 	const range1UnicodeEmojis = [];
 	const range2UnicodeEmojis = [];
-	// loop through emoji array
+	let emoji;
+	for (emoji of emojis) {
+		if (emoji.createdDate >= parameters.date1Minimum && emoji.createdDate <= parameters.date1Maximum) {
+			if (emoji.type === 'custom') {
+			}
+			else if (emoji.type === 'unicode') {
+			}
+		}
+		else if (emoji.createdDate >= parameters.date2Minimum && emoji.createdDate <= parameters.date2Maximum) {
+			if (emoji.type === 'custom') {
+			}
+			else if (emoji.type === 'unicode') {
+			}
+		}
+	}
 };
 
 const getTextChannelsFromLocations = (locationObjects) => {
@@ -164,7 +171,12 @@ const getTextChannelsFromLocations = (locationObjects) => {
 			}
 		}
 	}
-	return textChannels;
+	if (textChannels.length > 0) {
+		return textChannels;
+	}
+	else {
+		return null;
+	}
 }
 
 const getTextChannelsFromGuild = (guild) => {
@@ -193,6 +205,10 @@ const getGuildEmojis = (guild) => {
 };
 
 const isEmojiCollectionCacheStale = async (channel, emojiCollectionInfoDocument) => {
+	if (!emojiCollectionInfoDocument.cacheComplete) {
+		return true;
+	}
+
 	const recentMessageThresholdCount = 100;
 	const recentMessageThreshold = await getMostRecentTextChannelMessageFromDateRange(channel, 0, Date.now(), (-1 * recentMessageThresholdCount));
 	const recentMessageThresholdDate = new Date(recentMessageThreshold.createdTimestamp);
@@ -322,7 +338,9 @@ const crawlTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dat
 
 	while (message) {
 		let messageEmojis = await getEmojisFromMessage(message);
-		emojis = emojis.concat(messageEmojis);
+		if (messageEmojis.length > 0) {
+			emojis = emojis.concat(messageEmojis);
+		}
 
 		let previousMessage = await textChannel.messages.fetch({
 			before: message.id,
@@ -379,7 +397,7 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 			// Crawl new values.
 			await collection.deleteMany({});
 			const crawledEmojis = await crawlTextChannelEmojisFromDateRange(textChannel, dateRangeDay, DateHelpers.getDateDayMaximumDate(dateRangeDay), debug);
-			if (crawledEmojis.length) {
+			if (crawledEmojis) {
 				collectionInfoDocument = new EmojiCollectionInfoDocument({
 					name: emojiCollectionName,
 					guildId: textChannel.guild.id,
@@ -390,13 +408,12 @@ const getTextChannelEmojisFromDateRange = async (textChannel, dateMinimum, dateM
 				}, true);
 				await collection.insertOne(collectionInfoDocument.data);
 				collectionInfoDocument = await collection.findOne({collectionInfo: true});
-				await collection.insertMany(crawledEmojis.map((currentValue) => {
-					return currentValue.data;
-				}));
-				emojis = emojis.concat(crawledEmojis);
-				//
-				let emojiDocuments = await collection.find({collectionInfo: false}).toArray();
-				//
+				if (crawledEmojis.length > 0) {
+					await collection.insertMany(crawledEmojis.map((currentValue) => {
+						return currentValue.data;
+					}));
+					emojis = emojis.concat(crawledEmojis);
+				}
 			}
 		}
 	});
@@ -423,11 +440,10 @@ const getEmojisFromMessage = async (message) => {
 			emojis.push(emojiDocument);
 		}
 
-		const unicodeEmojisInContent = getUnicodeEmojiStringsFromString(message.content);
-		for (const unicodeEmoji of unicodeEmojisInContent) {
+		const unicodeEmojiStringsInContent = getUnicodeEmojiStringsFromString(message.content);
+		for (const unicodeEmojiString of unicodeEmojiStringsInContent) {
 			let emojiDocument = new EmojiDocument({
-				name: unicodeEmoji.name,
-				string: unicodeEmoji.string,
+				string: unicodeEmojiString,
 				type: 'unicode',
 				usage: 'content',
 				guildId: message.channel.guild.id,
@@ -445,9 +461,6 @@ const getEmojisFromMessage = async (message) => {
 		for (const user of reactionUsers.array()) {
 			if (!user.bot) {
 				let emojiObject = {
-					name: '',
-					string: '',
-					type: '',
 					usage: 'reaction',
 					guildId: message.channel.guild.id,
 					channelId: message.channel.id,
@@ -461,9 +474,8 @@ const getEmojisFromMessage = async (message) => {
 					emojiObject.type = 'custom';
 				}
 				else {
-					const unicodeEmoji = getUnicodeEmojiStringsFromString(reaction.emoji.name);
-					emojiObject.name = unicodeEmoji[0].name;
-					emojiObject.string = unicodeEmoji[0].string;
+					const unicodeEmojiString = getUnicodeEmojiStringsFromString(reaction.emoji.name);
+					emojiObject.string = unicodeEmojiString[0];
 					emojiObject.type = 'unicode';
 				}
 				emojiObject = new EmojiDocument(emojiObject, true);
@@ -506,13 +518,7 @@ const getUnicodeEmojiStringsFromString = (string) => {
 	const matches = [];
 	let match;
 	while (match = regex.exec(string)) {
-		const unicodeEmojiName = nodeEmoji.which(match[0]);
-		if (unicodeEmojiName) {
-			matches.push({
-				name: unicodeEmojiName,
-				string: match[0]
-			});
-		}
+		matches.push(match[0]);
 	}
 	return matches;
 };
@@ -548,6 +554,10 @@ discordClient.on("ready", async () => {
 	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
 	const testChannelId = '717428158609096764';
 	const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
+	const testMessageId = '721877273724321849';
+	const testMessage = await testChannel.messages.fetch(testMessageId);
+
+	console.log(getGuildEmojis(hiveGuild));
 });
 
 discordClient.on("message", async (message) => {
@@ -565,13 +575,13 @@ discordClient.on("message", async (message) => {
 				"... more coming soon."
 			]);
 		}
-		else if (message.content.includes("!emoji-report stocks") || message.content.includes("!emoji-report stoncks")) {
-			message.channel.send("Generating stocks report. This may take a while, I'll tag you when it's ready.");
+		else if (message.content.includes("!emoji-report stocks") || message.content.includes("!emoji-report stoncks") || message.content.includes("!emoji-report test")) {
+			message.channel.send("Generating emoji stock report. This may take a while, I'll tag you when it's ready.");
 			try {
 				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
-				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -2);
-				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -12);
-				generateEmojiReportStocks({
+				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -3);
+				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -6);
+				const emojiReportStocksMessage = generateEmojiReportStocks({
 					client: discordClient,
 					message: message,
 					locations: {
@@ -584,6 +594,7 @@ discordClient.on("message", async (message) => {
 					date2Maximum: DateHelpers.addMillisecondsToDate(date30DaysPast, -1),
 					debug: true
 				});
+				console.log('emojiReportStocksMessage:', await emojiReportStocksMessage);
 			}
 			catch (error) {
 				message.reply("Uh-oh, something went wrong, contact Spirgel, I'm just a bot. ¯\\_(ツ)_/¯");

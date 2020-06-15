@@ -51,9 +51,6 @@ const EmojiDocument = class {
 					throw new Error(this.constructor.name + ' name must be a string.');
 				}
 			}
-			else {
-				throw new Error(this.constructor.name + ' must have a name.');
-			}
 		}
 		catch (error) {
 			throw error;
