@@ -4,6 +4,9 @@ const Discord = require('discord.js');
 const emojiRegex = require('emoji-regex');
 
 const DateHelpers = require('./classes/DateHelpers');
+const DiscordHelpers = require('./classes/DiscordHelpers');
+const DatabaseConnection = require('./classes/DatabaseConnection');
+const EmojiReportStocks = require('./classes/EmojiReportStocks');
 const EmojiCollectionInfoDocument = require('./classes/EmojiCollectionInfoDocument');
 const EmojiDocument = require('./classes/EmojiDocument');
 
@@ -13,35 +16,6 @@ const EmojiDocument = require('./classes/EmojiDocument');
 const generateEmojiCollectionName = (guildId, textChannelId, year, month, day) => {
 	return 'guild:' + guildId + '_channel:' + textChannelId + '_date:' + year + '-' + month + '-' + day;
 }
-
-/*
-*/
-
-const isGuild = (guild) => {
-	try {
-		if (guild.constructor.name === 'Guild') {
-			return true;
-		}
-	}
-	catch (error) {}
-	return false;
-};
-const getClientGuildById = (client, guildId) => {
-	return client.guilds.cache.get(guildId);
-};
-
-const isTextChannel = (textChannel) => {
-	try {
-		if (textChannel.constructor.name === 'TextChannel') {
-			return true;
-		}
-	}
-	catch (error) {}
-	return false;
-};
-const getGuildChannelById = (guild, channelId) => {
-	return guild.channels.cache.get(channelId);
-};
 
 /*
 */
@@ -129,6 +103,7 @@ const generateEmojiReportStocks = async (parameters) => {
 
 	/*
 	CREATE CLASS FOR THESE ARRAYS?
+	EmojiStocksResults
 	*/
 	const range1GuildEmojis = getGuildEmojis(parameters.message.channel.guild);
 	const range2GuildEmojis = getGuildEmojis(parameters.message.channel.guild);
@@ -159,14 +134,14 @@ const getTextChannelsFromLocations = (locationObjects) => {
 	for (item of locationObjects) {
 		if (item.type === 'guild') {
 			let guild;
-			if (isGuild(item.location)) {
+			if (DiscordHelpers.isGuild(item.location)) {
 				guild = item.location;
 			}
-			const guildTextChannels = getTextChannelsFromGuild(guild);
+			const guildTextChannels = DiscordHelpers.getGuildTextChannels(guild);
 			textChannels = textChannels.concat(guildTextChannels);
 		}
 		else if (item.type === 'textChannel') {
-			if (isTextChannel(item.location)) {
+			if (DiscordHelpers.isTextChannel(item.location)) {
 				textChannels.push(item.location);
 			}
 		}
@@ -178,19 +153,6 @@ const getTextChannelsFromLocations = (locationObjects) => {
 		return null;
 	}
 }
-
-const getTextChannelsFromGuild = (guild) => {
-	const textChannels = [];
-	if (isGuild(guild)) {
-		let channel;
-		for (channel of guild.channels.cache.array()) {
-			if (isTextChannel(channel)) {
-				textChannels.push(channel);
-			}
-		}
-	}
-	return textChannels;
-};
 
 const getGuildEmojis = (guild) => {
 	const emoji = [];
@@ -557,7 +519,21 @@ discordClient.on("ready", async () => {
 	const testMessageId = '721877273724321849';
 	const testMessage = await testChannel.messages.fetch(testMessageId);
 
-	console.log(getGuildEmojis(hiveGuild));
+	const dateNow = DateHelpers.getDateWithoutTime(Date.now());
+	const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -3);
+	const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -6);
+
+	const emojiReportStocks = new EmojiReportStocks({
+		client: discordClient,
+		locations: hiveGuild,
+		date1Minimum: date30DaysPast,
+		date1Maximum: dateNow,
+		date2Minimum: date60DaysPast,
+		date2Maximum: DateHelpers.addMillisecondsToDate(date30DaysPast, -1),
+		debug: true
+	});
+	console.log('emojiReportStocks', emojiReportStocks);
+	await emojiReportStocks.generateMessage();
 });
 
 discordClient.on("message", async (message) => {
@@ -581,20 +557,20 @@ discordClient.on("message", async (message) => {
 				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
 				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -3);
 				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -6);
-				const emojiReportStocksMessage = generateEmojiReportStocks({
-					client: discordClient,
-					message: message,
-					locations: {
-						type: 'guild',
-						location: message.channel.guild
-					},
-					date1Minimum: date30DaysPast,
-					date1Maximum: dateNow,
-					date2Minimum: date60DaysPast,
-					date2Maximum: DateHelpers.addMillisecondsToDate(date30DaysPast, -1),
-					debug: true
-				});
-				console.log('emojiReportStocksMessage:', await emojiReportStocksMessage);
+				// const emojiReportStocksMessage = generateEmojiReportStocks({
+				// 	client: discordClient,
+				// 	message: message,
+				// 	locations: {
+				// 		type: 'guild',
+				// 		location: message.channel.guild
+				// 	},
+				// 	date1Minimum: date30DaysPast,
+				// 	date1Maximum: dateNow,
+				// 	date2Minimum: date60DaysPast,
+				// 	date2Maximum: DateHelpers.addMillisecondsToDate(date30DaysPast, -1),
+				// 	debug: true
+				// });
+				// console.log('emojiReportStocksMessage:', await emojiReportStocksMessage);
 			}
 			catch (error) {
 				message.reply("Uh-oh, something went wrong, contact Spirgel, I'm just a bot. ¯\\_(ツ)_/¯");

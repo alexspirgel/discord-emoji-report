@@ -1,4 +1,13 @@
 const DateHelpers = class {
+	static isValidDate(date) {
+		const timestamp = (new Date(date)).getTime();
+		if (!Number.isNaN(timestamp)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
 	static addDaysToDate(date, days) {
 		date = new Date(date);
 		return new Date(new Date(date).setDate(date.getDate() + days));
@@ -63,6 +72,23 @@ const DateHelpers = class {
 			dayDates.push(date);
 		}
 		return dayDates;
+	}
+	static getSingleDateRangeFromOverlappingDateRanges(date1Minimum, date1Maximum, date2Minimum, date2Maximum) {
+		if (this.isValidDate(date1Minimum) && this.isValidDate(date1Maximum) && this.isValidDate(date2Minimum) && this.isValidDate(date2Maximum)) {
+			if (date1Minimum <= this.addMillisecondsToDate(date2Maximum, 1) && date1Maximum >= this.addMillisecondsToDate(date2Minimum, -1)) {
+				const range = {};
+				range.minimum = date1Minimum;
+				range.maximum = date1Maximum;
+				if (date2Minimum < range.minimum) {
+					range.minimum = date2Minimum;
+				}
+				if (date2Maximum > range.maximum) {
+					range.maximum = date2Maximum;
+				}
+				return range;
+			}
+		}
+		return false;
 	}
 }
 
