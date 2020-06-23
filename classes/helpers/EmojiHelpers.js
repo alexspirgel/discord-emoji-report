@@ -1,3 +1,5 @@
+const emojiRegex = require('emoji-regex');
+
 const EmojiHelpers = class {
 	static getCustomEmojiNameFromCustomEmojiString(customEmojiString) {
 		const regex = /(?<=<:)(.*)(?=:\d+>)/;
@@ -15,7 +17,7 @@ const EmojiHelpers = class {
 		if (regexMatches) {
 			for (match of regexMatches) {
 				matches.push({
-					name: getCustomEmojiNameFromCustomEmojiString(match),
+					name: this.getCustomEmojiNameFromCustomEmojiString(match),
 					string: match
 				});
 			}

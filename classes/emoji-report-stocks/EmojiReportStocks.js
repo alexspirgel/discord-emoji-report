@@ -1,5 +1,5 @@
-const DateHelpers = require('./DateHelpers');
-const DiscordHelpers = require('./DiscordHelpers');
+const DateHelpers = require('../helpers/DateHelpers');
+const DiscordHelpers = require('../helpers/DiscordHelpers');
 
 /*
 client: Client,
@@ -227,13 +227,106 @@ const EmojiReportStocks = class {
 			}
 		}
 	}
-	async generateMessage() {
+	async getEmojis() {
+		let emojis = [];
 		for (let locationTextChannel of this.locationTextChannels) {
 			for (let dateRange of this.dateRanges) {
-				DiscordHelpers.getTextChannelEmojisFromDateRange(locationTextChannel, dateRange.minimum, dateRange.maximum, this.debug);
+				const emojiResults = await DiscordHelpers.getTextChannelEmojisFromDateRange(locationTextChannel, dateRange.minimum, dateRange.maximum, this.debug);
+				if (emojiResults) {
+					emojis = emojis.concat(emojiResults);
+				}
 			}
-			break;
 		}
+		return emojis;
+	}
+	getEmojiCountList(emojis) {
+		const emojiCountList = [];
+		for (let emoji of emojis) {
+			let listEmoji = emojiCountList.find((listEmoji) => {
+				if (emoji.string === listEmoji.string) {
+					return true;
+				}
+			});
+			if (!listEmoji) {
+				listEmoji = {
+					string: emoji.string,
+					range1Count: 0,
+					range2Count: 0
+				};
+				if (emoji.type === 'custom') {
+					listEmoji.type = 'custom';
+				}
+				else if (emoji.type === 'unicode') {
+					listEmoji.type = 'unicode';
+				}
+				emojiCountList.push(listEmoji);
+			}
+			if (DateHelpers.isDateWithinRange(emoji.createdDate, this.date1Minimum, this.date1Maximum)) {
+				listEmoji.range1Count++;
+			}
+			else if (DateHelpers.isDateWithinRange(emoji.createdDate, this.date2Minimum, this.date2Maximum)) {
+				listEmoji.range2Count++;
+			}
+		}
+		const compare = (a, b) => {
+			const differenceA = a.range1Count - a.range2Count;
+			const differenceB = b.range1Count - b.range2Count;
+			if (differenceA < differenceB) {
+				return 1;
+			}
+			else if (differenceA > differenceB) {
+				return -1;
+			}
+			else {
+				if (a.type === 'custom' && b.type === 'unicode') {
+					return -1;
+				}
+				if (a.type === 'unicode' && b.type === 'custom') {
+					return 1;
+				}
+				return 0;
+			}
+		};
+		emojiCountList.sort(compare);
+		return emojiCountList;
+	}
+	async generateMessage() {
+		const roundPercent = (number) => {
+			return Math.round((number + Number.EPSILON) * 100) / 100;
+		};
+		let message = [];
+		const emojis = await this.getEmojis();
+		const emojiCountList = this.getEmojiCountList(emojis);
+		for (let emoji of emojiCountList) {
+			let thisMessage = emoji.string
+
+			const difference = emoji.range1Count - emoji.range2Count;
+			if (difference > 0) {
+				thisMessage = thisMessage + " +" + difference.toString();
+			}
+			else {
+				thisMessage = thisMessage + " " + difference.toString();
+			}
+
+			if (emoji.range2Count === 0) {
+				thisMessage = thisMessage + " (from 0) 🡅";
+			}
+			else {
+				const percent = ((difference / emoji.range2Count) * 100);
+				if (percent > 0) {
+					thisMessage = thisMessage + " (+" + roundPercent(percent).toString() + "%) 🡅";
+				}
+				else if (percent === 0) {
+					thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%)";
+				}
+				else if (percent < 0) {
+					thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%) 🡇";
+				}
+			}
+
+			message.push(thisMessage);
+		}
+		return message;
 	}
 };
 
