@@ -90,6 +90,38 @@ const DateHelpers = class {
 		}
 		return false;
 	}
+	static millisecondsToString(duration) {
+		let string = '';
+		// const milliseconds = parseInt((duration % 1000) / 100);
+		const seconds = Math.floor((duration / 1000) % 60);
+		const minutes = Math.floor((duration / (1000 * 60)) % 60);
+		const hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+		if (hours) {
+			string += hours + ' hour';
+			if (hours > 1) {
+				string += 's'
+			}
+		}
+		if (minutes) {
+			if (string) {
+				string += ', '
+			}
+			string += minutes + ' minute';
+			if (minutes > 1) {
+				string += 's'
+			}
+		}
+		if (seconds) {
+			if (string) {
+				string += ', '
+			}
+			string += seconds + ' second';
+			if (seconds > 1) {
+				string += 's'
+			}
+		}
+		return string;
+	}
 }
 
 module.exports = DateHelpers;

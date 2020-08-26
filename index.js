@@ -47,7 +47,7 @@ discordClient.on("ready", async () => {
 discordClient.on("message", async (message) => {
 	// FOR TESTING SO IT ONLY RESPONDS TO ME
 	const spirgelUserId = '273695758887157762';
-	if (!message.author.bot && message.author.id === spirgelUserId) {
+	if (!message.author.bot) {
 		if (message.content.includes("!emoji-report help")) {
 			message.reply([
 				"I'm a bot that can show you various statistics about emoji usage on this server.",
@@ -56,34 +56,43 @@ discordClient.on("message", async (message) => {
 				"`!emoji-report stocks`",
 				"> Displays a comparison of recent emoji usage to their usage in the past.",
 				"",
-				"`!emoji-report kings`",
-				"> Displays who uses each emoji the most.",
-				"",
+				// "`!emoji-report kings`",
+				// "> Displays who uses each emoji the most.",
+				// "",
 				"... more coming soon."
 			]);
 		}
-		else if (message.content.includes("!emoji-report stocks") || message.content.includes("!emoji-report stoncks")) {
+		else if (message.content.startsWith("!emoji-report stocks") || message.content.startsWith("!emoji-report stoncks")) {
 			message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
+			const reportRequestedTimestamp = Date.now();
 			try {
 				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
-				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -30);
-				const date60DaysPast = DateHelpers.addDaysToDate(dateNow, -60);
+				const date7DaysPast = DateHelpers.addDaysToDate(dateNow, -7);
+				const date14DaysPast = DateHelpers.addDaysToDate(dateNow, -14);
 
 				const emojiReportStocks = new EmojiReportStocks({
 					client: discordClient,
 					locations: message.channel.guild,
-					date1Minimum: date30DaysPast,
+					date1Minimum: date7DaysPast,
 					date1Maximum: dateNow,
-					date2Minimum: date60DaysPast,
-					date2Maximum: DateHelpers.addMillisecondsToDate(date30DaysPast, -1),
+					date2Minimum: date14DaysPast,
+					date2Maximum: DateHelpers.addMillisecondsToDate(date7DaysPast, -1),
 					debug: true
 				});
 
-				const stocksMessages = await emojiReportStocks.generateMessage();
-				message.reply("Here is your emoji stocks report:");
-				for (let stocksMessage of stocksMessages) {
+				const stocksMessages = await emojiReportStocks.generateMessages();
+				const groupedStocksMessages = DiscordHelpers.groupMessages(stocksMessages);
+				message.reply("Here is your emoji stocks report comparing the past week of emoji usage to their usage from the week prior.");
+				for (let stocksMessage of groupedStocksMessages) {
 					message.channel.send(stocksMessage);
 				}
+				const reportDeliveredTimestamp = Date.now();
+				const reportDurationMilliseconds = reportDeliveredTimestamp - reportRequestedTimestamp;
+				const reportDurationString = DateHelpers.millisecondsToString(reportDurationMilliseconds);
+				message.channel.send([
+					"Report Finished.",
+					"This report was generated in " + reportDurationString
+				]);
 			}
 			catch (error) {
 				message.reply(defaultErrorMessage);
@@ -91,17 +100,19 @@ discordClient.on("message", async (message) => {
 			}
 		}
 		else if (message.content === "!emoji-report kings" || message.content === "!emoji-report short-kings" || message.content === "!emoji-report queens" || message.content === "!emoji-report qweens") {
-			message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
-			try {
-				// const emojiReportKings = new EmojiReportKings({
-				// 	client: discordClient,
-				// 	locations: message.channel.guild,
-				// 	debug: true
-				// });
-			}
-			catch (error) {
-				message.reply(defaultErrorMessage);
-				console.error(error);
+			if (message.author.id === spirgelUserId) {
+				message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
+				try {
+					// const emojiReportKings = new EmojiReportKings({
+					// 	client: discordClient,
+					// 	locations: message.channel.guild,
+					// 	debug: true
+					// });
+				}
+				catch (error) {
+					message.reply(defaultErrorMessage);
+					console.error(error);
+				}
 			}
 		}
 	}

@@ -358,5 +358,30 @@ const DiscordHelpers = class {
 		});
 		return emoji;
 	};
+	static groupMessages(messages) {
+		const groupedMessages = [];
+		const newlineString = "\n";
+		const discordMessageCharacterLimit = 2000;
+		let groupedMessage = '';
+		for (const message of messages) {
+			if (message.length <= discordMessageCharacterLimit) {
+				if ((groupedMessage.length + message.length) <= (discordMessageCharacterLimit - newlineString.length)) {
+					if (groupedMessage.length > 0) {
+						groupedMessage += newlineString;
+					}
+					groupedMessage += message;
+				}
+				else {
+					groupedMessages.push(groupedMessage);
+					groupedMessage = message;
+				}
+			}
+			else {
+				throw new Error(`Any single message cannot exceed ${discordMessageCharacterLimit} characters.`);
+			}
+		}
+		groupedMessages.push(groupedMessage);
+		return groupedMessages;
+	}
 };
 module.exports = DiscordHelpers;

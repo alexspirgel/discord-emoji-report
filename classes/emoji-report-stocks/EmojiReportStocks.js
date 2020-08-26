@@ -239,7 +239,7 @@ const EmojiReportStocks = class {
 		}
 		return emojis;
 	}
-	getEmojiCountList(emojis) {
+	generateEmojiCountList(emojis) {
 		const emojiCountList = [];
 		for (let emoji of emojis) {
 			let listEmoji = emojiCountList.find((listEmoji) => {
@@ -278,55 +278,69 @@ const EmojiReportStocks = class {
 				return -1;
 			}
 			else {
-				if (a.type === 'custom' && b.type === 'unicode') {
-					return -1;
-				}
-				if (a.type === 'unicode' && b.type === 'custom') {
-					return 1;
-				}
 				return 0;
 			}
 		};
 		emojiCountList.sort(compare);
 		return emojiCountList;
 	}
-	async generateMessage() {
+	generateMessage(emojiCountListItem) {
 		const roundPercent = (number) => {
 			return Math.round((number + Number.EPSILON) * 100) / 100;
 		};
-		let message = [];
-		const emojis = await this.getEmojis();
-		const emojiCountList = this.getEmojiCountList(emojis);
-		for (let emoji of emojiCountList) {
-			let thisMessage = emoji.string
 
-			const difference = emoji.range1Count - emoji.range2Count;
-			if (difference > 0) {
-				thisMessage = thisMessage + " +" + difference.toString();
-			}
-			else {
-				thisMessage = thisMessage + " " + difference.toString();
-			}
+		let thisMessage = emojiCountListItem.string;
 
-			if (emoji.range2Count === 0) {
-				thisMessage = thisMessage + " (from 0) 🡅";
-			}
-			else {
-				const percent = ((difference / emoji.range2Count) * 100);
-				if (percent > 0) {
-					thisMessage = thisMessage + " (+" + roundPercent(percent).toString() + "%) 🡅";
-				}
-				else if (percent === 0) {
-					thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%)";
-				}
-				else if (percent < 0) {
-					thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%) 🡇";
-				}
-			}
-
-			message.push(thisMessage);
+		const difference = emojiCountListItem.range1Count - emojiCountListItem.range2Count;
+		thisMessage = thisMessage + " "
+		if (difference > 0) {
+			thisMessage = thisMessage + "+";
 		}
-		return message;
+		thisMessage = thisMessage + difference.toString();
+
+		if (emojiCountListItem.range2Count === 0) {
+			thisMessage = thisMessage + " (from 0) 🡅";
+		}
+		else {
+			const percent = ((difference / emojiCountListItem.range2Count) * 100);
+			if (percent > 0) {
+				thisMessage = thisMessage + " (+" + roundPercent(percent).toString() + "%) 🡅";
+			}
+			else if (percent === 0) {
+				thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%)";
+			}
+			else if (percent < 0) {
+				thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%) 🡇";
+			}
+		}
+		return thisMessage;
+	}
+	async generateMessages() {
+		let messages = [];
+
+		const emojis = await this.getEmojis();
+		const emojiCountList = this.generateEmojiCountList(emojis);
+		const emojiCustomCountList = emojiCountList.filter((element) => {
+			if (element.type === 'custom') {
+				return true;
+			}
+		});
+		const emojiUnicodeCountList = emojiCountList.filter((element) => {
+			if (element.type === 'unicode') {
+				return true;
+			}
+		});
+		
+		for (let emojiCountListItem of emojiCustomCountList) {
+			const thisMessage = this.generateMessage(emojiCountListItem);
+			messages.push(thisMessage);
+		}
+		
+		// if (emojiUnicodeCountList.length >= 10) {
+		// 	for (let i = 0; i < 4; i++) {}
+		// 	for (let i = (emojiUnicodeCountList.length - 1); i > (emojiUnicodeCountList.length - 5); i--) {}
+		// }
+		return messages;
 	}
 };
 
