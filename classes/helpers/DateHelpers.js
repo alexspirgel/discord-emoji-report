@@ -53,9 +53,9 @@ const DateHelpers = class {
 		};
 	}
 	static isDateWithinRange(date, dateMinimum, dateMaximum) {
+		date = new Date(date);
 		dateMinimum = new Date(dateMinimum);
 		dateMaximum = new Date(dateMaximum);
-		date = new Date(date);
 		if (date >= dateMinimum && date <= dateMaximum) {
 			return true;
 		}

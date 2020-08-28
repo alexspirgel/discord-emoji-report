@@ -6,7 +6,7 @@ const emojiRegex = require('emoji-regex');
 const DateHelpers = require('./classes/helpers/DateHelpers');
 const DiscordHelpers = require('./classes/helpers/DiscordHelpers');
 const EmojiHelpers = require('./classes/helpers/EmojiHelpers');
-const EmojiReportStocks = require('./classes/emoji-report-stocks/EmojiReportStocks');
+const EmojiReportStocks = require('./classes/commands/EmojiReportStocks');
 
 const defaultErrorMessage = "Uh-oh, something went wrong, contact Spirgel, I'm just a bot. ¯\\_(ツ)_/¯";
 
@@ -66,7 +66,7 @@ discordClient.on("message", async (message) => {
 			message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
 			const reportRequestedTimestamp = Date.now();
 			try {
-				const dateNow = DateHelpers.getDateWithoutTime(Date.now());
+				const dateNow = Date.now();
 				const date7DaysPast = DateHelpers.addDaysToDate(dateNow, -7);
 				const date14DaysPast = DateHelpers.addDaysToDate(dateNow, -14);
 
@@ -80,19 +80,15 @@ discordClient.on("message", async (message) => {
 					debug: true
 				});
 
-				const stocksMessages = await emojiReportStocks.generateMessages();
-				const groupedStocksMessages = DiscordHelpers.groupMessages(stocksMessages);
+				const stocksOutput = await emojiReportStocks.generateOutput();
 				message.reply("Here is your emoji stocks report comparing the past week of emoji usage to their usage from the week prior.");
-				for (let stocksMessage of groupedStocksMessages) {
+				for (let stocksMessage of stocksOutput) {
 					message.channel.send(stocksMessage);
 				}
 				const reportDeliveredTimestamp = Date.now();
 				const reportDurationMilliseconds = reportDeliveredTimestamp - reportRequestedTimestamp;
 				const reportDurationString = DateHelpers.millisecondsToString(reportDurationMilliseconds);
-				message.channel.send([
-					"Report Finished.",
-					"This report was generated in " + reportDurationString
-				]);
+				message.channel.send("Report finished in " + reportDurationString + ".");
 			}
 			catch (error) {
 				message.reply(defaultErrorMessage);

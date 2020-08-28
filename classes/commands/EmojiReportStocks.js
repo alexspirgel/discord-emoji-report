@@ -167,7 +167,7 @@ const EmojiReportStocks = class {
 				this._debug = debug;
 			}
 			else {
-				throw new Error(this.constructor.name + ' debug parameter must be undefiend or a boolean.');
+				throw new Error(this.constructor.name + ' debug parameter must be undefined or a boolean.');
 			}
 		}
 		catch (error) {
@@ -247,6 +247,7 @@ const EmojiReportStocks = class {
 					return true;
 				}
 			});
+
 			if (!listEmoji) {
 				listEmoji = {
 					string: emoji.string,
@@ -261,6 +262,7 @@ const EmojiReportStocks = class {
 				}
 				emojiCountList.push(listEmoji);
 			}
+
 			if (DateHelpers.isDateWithinRange(emoji.createdDate, this.date1Minimum, this.date1Maximum)) {
 				listEmoji.range1Count++;
 			}
@@ -291,6 +293,8 @@ const EmojiReportStocks = class {
 
 		let thisMessage = emojiCountListItem.string;
 
+		thisMessage = thisMessage + '  **' + emojiCountListItem.range1Count + '**  ';
+
 		const difference = emojiCountListItem.range1Count - emojiCountListItem.range2Count;
 		thisMessage = thisMessage + " "
 		if (difference > 0) {
@@ -299,23 +303,21 @@ const EmojiReportStocks = class {
 		thisMessage = thisMessage + difference.toString();
 
 		if (emojiCountListItem.range2Count === 0) {
-			thisMessage = thisMessage + " (from 0) 🡅";
+			thisMessage = thisMessage + " (from 0) ▲";
 		}
 		else {
 			const percent = ((difference / emojiCountListItem.range2Count) * 100);
-			if (percent > 0) {
-				thisMessage = thisMessage + " (+" + roundPercent(percent).toString() + "%) 🡅";
+			thisMessage = thisMessage + " (" + Math.abs(roundPercent(percent)).toString() + "%)";
+			if (difference > 0) {
+				thisMessage = thisMessage + " ▲";
 			}
-			else if (percent === 0) {
-				thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%)";
-			}
-			else if (percent < 0) {
-				thisMessage = thisMessage + " (" + roundPercent(percent).toString() + "%) 🡇";
+			else if (difference < 0) {
+				thisMessage = thisMessage + " ▼";
 			}
 		}
 		return thisMessage;
 	}
-	async generateMessages() {
+	async generateOutput() {
 		let messages = [];
 
 		const emojis = await this.getEmojis();
@@ -340,7 +342,7 @@ const EmojiReportStocks = class {
 		// 	for (let i = 0; i < 4; i++) {}
 		// 	for (let i = (emojiUnicodeCountList.length - 1); i > (emojiUnicodeCountList.length - 5); i--) {}
 		// }
-		return messages;
+		return DiscordHelpers.groupMessages(messages);
 	}
 };
 
