@@ -72,9 +72,9 @@ const DiscordHelpers = class {
 	
 		return false;
 	};
-	static async getTextChannelEmojisFromDateRange(textChannel, dateMinimum, dateMaximum, debug = false) {
+	static async getTextChannelEmojisFromDateRange(textChannel, dateMinimum, dateMaximum, forceBuildCache = false, debug = false) {
 		if (debug) {
-			console.log(`Getting emojis in channel '${textChannel.name}' from between dates ${dateMinimum} and ${dateMaximum}.`);
+			console.log(`Getting emojis in channel '${textChannel.name}' from between dates ${new Date(dateMinimum)} and ${new Date(dateMaximum)}.`);
 		}
 		let emojis = [];
 		const dateRangeDays = DateHelpers.getDateDaysFromRange(dateMinimum, dateMaximum);
@@ -91,7 +91,7 @@ const DiscordHelpers = class {
 			// Try using cached values.
 			if (collectionInfoDocument) {
 				const emojiCollectionCacheStale = await this.isEmojiCollectionCacheStale(textChannel, collectionInfoDocument);
-				if (!emojiCollectionCacheStale) {
+				if (!emojiCollectionCacheStale && !forceBuildCache) {
 					if (debug) {
 						console.log(`Channel '${textChannel.name}' date '${dateRangeDay}' emoji cache is fresh.`);
 					}
@@ -286,33 +286,47 @@ const DiscordHelpers = class {
 		if (!message.author.bot) {
 			const customEmojisInContent = EmojiHelpers.getCustomEmojiStringsFromString(message.content);
 			for (const customEmoji of customEmojisInContent) {
-				let emojiDocument = new EmojiDocument({
-					name: customEmoji.name,
-					string: customEmoji.string,
-					type: 'custom',
-					usage: 'content',
-					guildId: message.channel.guild.id,
-					channelId: message.channel.id,
-					messageId: message.id,
-					userId: message.author.id,
-					createdDate: message.createdTimestamp
-				}, true);
-				emojis.push(emojiDocument);
+				try {
+					let emojiDocument = new EmojiDocument({
+						name: customEmoji.name,
+						string: customEmoji.string,
+						type: 'custom',
+						usage: 'content',
+						guildId: message.channel.guild.id,
+						channelId: message.channel.id,
+						messageId: message.id,
+						userId: message.author.id,
+						createdDate: message.createdTimestamp
+					}, true);
+					emojis.push(emojiDocument);
+				}
+				catch(error) {
+					console.error(error);
+					console.log('from crawl (custom)');
+					console.log(message);
+				}
 			}
 	
 			const unicodeEmojiStringsInContent = EmojiHelpers.getUnicodeEmojiStringsFromString(message.content);
 			for (const unicodeEmojiString of unicodeEmojiStringsInContent) {
-				let emojiDocument = new EmojiDocument({
-					string: unicodeEmojiString,
-					type: 'unicode',
-					usage: 'content',
-					guildId: message.channel.guild.id,
-					channelId: message.channel.id,
-					messageId: message.id,
-					userId: message.author.id,
-					createdDate: message.createdTimestamp
-				}, true);
-				emojis.push(emojiDocument);
+				try {
+					let emojiDocument = new EmojiDocument({
+						string: unicodeEmojiString,
+						type: 'unicode',
+						usage: 'content',
+						guildId: message.channel.guild.id,
+						channelId: message.channel.id,
+						messageId: message.id,
+						userId: message.author.id,
+						createdDate: message.createdTimestamp
+					}, true);
+					emojis.push(emojiDocument);
+				}
+				catch(error) {
+					console.error(error);
+					console.log('from crawl (unicode)');
+					console.log(message);
+				}
 			}
 		}
 	
@@ -338,8 +352,15 @@ const DiscordHelpers = class {
 						emojiObject.string = unicodeEmojiString[0];
 						emojiObject.type = 'unicode';
 					}
-					emojiObject = new EmojiDocument(emojiObject, true);
-					emojis.push(emojiObject);
+					try {
+						emojiObject = new EmojiDocument(emojiObject, true);
+						emojis.push(emojiObject);
+					}
+					catch(error) {
+						console.error(error);
+						console.log('from crawl (reaction)');
+						console.log(reaction.emoji);
+					}
 				}
 			}
 		}

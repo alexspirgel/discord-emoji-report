@@ -231,7 +231,7 @@ const EmojiReportStocks = class {
 		let emojis = [];
 		for (let locationTextChannel of this.locationTextChannels) {
 			for (let dateRange of this.dateRanges) {
-				const emojiResults = await DiscordHelpers.getTextChannelEmojisFromDateRange(locationTextChannel, dateRange.minimum, dateRange.maximum, this.debug);
+				const emojiResults = await DiscordHelpers.getTextChannelEmojisFromDateRange(locationTextChannel, dateRange.minimum, dateRange.maximum, false, this.debug);
 				if (emojiResults) {
 					emojis = emojis.concat(emojiResults);
 				}
