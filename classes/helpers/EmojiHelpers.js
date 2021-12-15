@@ -1,6 +1,6 @@
 const emojiRegex = require('emoji-regex');
 
-const additionalEmojiRegex = /☹|⚔|♥|☠|✡|❤|☺|™/g
+const additionalEmojiRegex = /☹|⚔|♥|☠|✡|❤|☺|™|✔|☎|2⃣|7⃣|3⃣|0⃣|➡|⬅|⚖|▶|❄|✝|☮/g
 
 const emojiErrors = [
 	{
@@ -22,6 +22,50 @@ const emojiErrors = [
 				type: 'reaction',
 				messageId: '511705983987351552',
 				channelId: '231204322145337344'
+			}
+		]
+	},
+	{
+		string: '�',
+		name: ':b:',
+		instances: [
+			{
+				type: 'reaction',
+				messageId: '619305858873950243',
+				channelId: '231204322145337344'
+			}
+		]
+	},
+	{
+		string: '�',
+		name: ':a:',
+		instances: [
+			{
+				type: 'reaction',
+				messageId: '630801563182563330',
+				channelId: '231204322145337344'
+			}
+		]
+	},
+	{
+		string: '�',
+		name: ':o:',
+		instances: [
+			{
+				type: 'reaction',
+				messageId: '591630234655129616',
+				channelId: '316312140350881803'
+			}
+		]
+	},
+	{
+		string: '�',
+		name: ':hot_pepper:',
+		instances: [
+			{
+				type: 'reaction',
+				messageId: '576034836502937620',
+				channelId: '341710270701371393'
 			}
 		]
 	}

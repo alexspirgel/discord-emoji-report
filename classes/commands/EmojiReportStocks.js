@@ -332,6 +332,8 @@ const EmojiReportStocks = class {
 				return true;
 			}
 		});
+		// console.log('emojiUnicodeCountList');
+		// console.log(emojiUnicodeCountList);
 		
 		for (let emojiCountListItem of emojiCustomCountList) {
 			const thisMessage = this.generateMessage(emojiCountListItem);

@@ -27,21 +27,16 @@ discordClient.on("ready", async () => {
 	
 	const hiveGuildId = '231204322145337344';
 	const hiveGuild = discordClient.guilds.cache.get(hiveGuildId);
-	const generalChannelId = '231204322145337344';
-	const generalChannel = hiveGuild.channels.cache.get(generalChannelId);
-	const botChannelId = '718193008939368499';
-	const botChannel = hiveGuild.channels.cache.get(botChannelId);
-	const voiceChannelId = '231204322145337345';
-	const voiceChannel = hiveGuild.channels.cache.get(voiceChannelId);
 	
 	const spirgelsGuildId = '717413056086278196';
 	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
 	const testChannelId = '717428158609096764';
 	const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
-	const testMessageId = '749422424021270528';
+	const testMessageId = '749741331370213376';
 	const testMessage = await testChannel.messages.fetch(testMessageId);
 
-	// DiscordHelpers.getTextChannelEmojisFromDateRange(generalChannel, '04/14/2019', '04/14/2019', true, true);
+	// DiscordHelpers.getTextChannelEmojisFromDateRange(desktopChannel, '09/02/2018', Date.now(), false, true);
+	// console.log(await DiscordHelpers.getEmojisFromMessage(testMessage));
 });
 
 discordClient.on("message", async (message) => {
@@ -52,7 +47,7 @@ discordClient.on("message", async (message) => {
 				"I'm a bot that can show you various statistics about emoji usage on this server.",
 				"Here are some commands you can choose from:",
 				"",
-				"`!emoji-report stocks`",
+				"`!emoji-report stocks` (aliases include: `!emoji-report stonks`)",
 				"> Displays a comparison of recent emoji usage to their usage in the past.",
 				"",
 				// "`!emoji-report kings`",
@@ -61,7 +56,7 @@ discordClient.on("message", async (message) => {
 				"... more coming soon."
 			]);
 		}
-		else if (message.content.startsWith("!emoji-report stocks") || message.content.startsWith("!emoji-report stoncks")) {
+		else if (message.content.startsWith("!emoji-report stocks") || message.content.startsWith("!emoji-report stonks")) {
 			message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
 			const reportRequestedTimestamp = Date.now();
 			try {
