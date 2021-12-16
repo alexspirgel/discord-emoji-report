@@ -7,7 +7,13 @@ const DateHelpers = require('./classes/helpers/DateHelpers');
 const DiscordHelpers = require('./classes/helpers/DiscordHelpers');
 const EmojiHelpers = require('./classes/helpers/EmojiHelpers');
 const EmojiReportStocks = require('./classes/commands/EmojiReportStocks');
+const EmojiReportKings = require('./classes/commands/EmojiReportKings');
 
+
+const devMode = true;
+const spirgelUserId = '273695758887157762';
+const devUserId = spirgelUserId;
+const devModeReply = "I am in testing mode, I will only respond to the bot admin right now, sorry this is only temporary for testing.";
 const defaultErrorMessage = "uh-oh, something went wrong, contact Spirgel, I'm just a bot. ¯\\_(ツ)_/¯";
 
 const discordClient = new Discord.Client();
@@ -25,43 +31,48 @@ discordClient.on("ready", async () => {
 	console.log('==========');
 	console.log(`Logged in as ${discordClient.user.tag}!`);
 	
-	const hiveGuildId = '231204322145337344';
-	const hiveGuild = discordClient.guilds.cache.get(hiveGuildId);
+	// const hiveGuildId = '231204322145337344';
+	// const hiveGuild = discordClient.guilds.cache.get(hiveGuildId);
 	
-	const spirgelsGuildId = '717413056086278196';
-	const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
-	const testChannelId = '717428158609096764';
-	const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
-	const testMessageId = '749741331370213376';
-	const testMessage = await testChannel.messages.fetch(testMessageId);
+	// const spirgelsGuildId = '717413056086278196';
+	// const spirgelsGuild = discordClient.guilds.cache.get(spirgelsGuildId);
+	// const testChannelId = '717428158609096764';
+	// const testChannel = spirgelsGuild.channels.cache.get(testChannelId);
+	// const testMessageId = '749741331370213376';
+	// const testMessage = await testChannel.messages.fetch(testMessageId);
 
-	// DiscordHelpers.getTextChannelEmojisFromDateRange(desktopChannel, '09/02/2018', Date.now(), false, true);
-	// console.log(await DiscordHelpers.getEmojisFromMessage(testMessage));
 });
 
 discordClient.on("message", async (message) => {
-	const spirgelUserId = '273695758887157762'; // FOR TESTING SO IT ONLY RESPONDS TO ME
 	if (!message.author.bot) {
-		if (message.content.includes("!emoji-report help")) {
+		if (message.content === ("!emoji-report") || message.content.startsWith("!emoji-report help")) {
+			if (devMode && message.author.id !== devUserId) {
+				message.channel.send(devModeReply);
+				return;
+			}
 			message.reply([
 				"I'm a bot that can show you various statistics about emoji usage on this server.",
 				"Here are some commands you can choose from:",
 				"",
-				"`!emoji-report stocks` (aliases include: `!emoji-report stonks`)",
+				":chart_with_upwards_trend: `!emoji-report stocks`",
 				"> Displays a comparison of recent emoji usage to their usage in the past.",
+				"> aliases include: `!emoji-report stonks`",
 				"",
-				// "`!emoji-report kings`",
-				// "> Displays who uses each emoji the most.",
-				// "",
-				"... more coming soon."
+				":crown: `!emoji-report kings`",
+				"> Displays who uses each emoji the most.",
+				"> aliases include: `!emoji-report short kings`, `!emoji-report queens`, `!emoji-report qweens`"
 			]);
 		}
 		else if (message.content.startsWith("!emoji-report stocks") || message.content.startsWith("!emoji-report stonks")) {
-			message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
+			if (devMode && message.author.id !== devUserId) {
+				message.channel.send(devModeReply);
+				return;
+			}
+			message.channel.send("Generating :chart_with_upwards_trend: report. This may take a while, I'll tag you when it's ready.");
 			const reportRequestedTimestamp = Date.now();
 			try {
 				let date1Minimum, date1Maximum, date2Minimum, date2Maximum, timeScale;
-				const dateNow = Date.now();
+				const dateNow = reportRequestedTimestamp;
 
 				if (message.content.includes("from the past year")) {
 					timeScale = 'year';
@@ -109,27 +120,47 @@ discordClient.on("message", async (message) => {
 				const reportDeliveredTimestamp = Date.now();
 				const reportDurationMilliseconds = reportDeliveredTimestamp - reportRequestedTimestamp;
 				const reportDurationString = DateHelpers.millisecondsToString(reportDurationMilliseconds);
-				message.channel.send("Report finished in " + reportDurationString + ".");
+				message.channel.send("Report created in " + reportDurationString + ".");
 			}
 			catch (error) {
 				message.reply(defaultErrorMessage);
 				console.error(error);
 			}
 		}
-		else if (message.content === "!emoji-report kings" || message.content === "!emoji-report short-kings" || message.content === "!emoji-report queens" || message.content === "!emoji-report qweens") {
-			if (message.author.id === spirgelUserId) {
-				message.channel.send("Generating report. This may take a while, I'll tag you when it's ready.");
-				try {
-					// const emojiReportKings = new EmojiReportKings({
-					// 	client: discordClient,
-					// 	locations: message.channel.guild,
-					// 	debug: true
-					// });
+		else if (message.content.startsWith("!emoji-report kings") || message.content.startsWith("!emoji-report short kings") || message.content.startsWith("!emoji-report queens") || message.content.startsWith("!emoji-report qweens")) {
+			if (devMode && message.author.id !== devUserId) {
+				message.channel.send(devModeReply);
+				return;
+			}
+			message.channel.send("Generating :crown: report. This may take a while, I'll tag you when it's ready.");
+			const reportRequestedTimestamp = Date.now();
+			try {
+				const dateNow = reportRequestedTimestamp;
+				const date30DaysPast = DateHelpers.addDaysToDate(dateNow, -30);
+				const dateMinimum = date30DaysPast;
+				const dateMaximum = dateNow;
+				const emojiReportKings = new EmojiReportKings({
+					client: discordClient,
+					guild: message.channel.guild,
+					dateMinimum: dateMinimum,
+					dateMaximum: dateMaximum,
+					minimumUseThreshold: 3,
+					debug: true
+				});
+
+				const kingsOutput = await emojiReportKings.generateOutput();
+				message.reply(`here is your emoji kings report displaying who used each emoji the most over the course of the past month.`);
+				for (let kingsMessage of kingsOutput) {
+					message.channel.send(kingsMessage);
 				}
-				catch (error) {
-					message.reply(defaultErrorMessage);
-					console.error(error);
-				}
+				const reportDeliveredTimestamp = Date.now();
+				const reportDurationMilliseconds = reportDeliveredTimestamp - reportRequestedTimestamp;
+				const reportDurationString = DateHelpers.millisecondsToString(reportDurationMilliseconds);
+				message.channel.send("Report created in " + reportDurationString + ".");
+			}
+			catch (error) {
+				message.reply(defaultErrorMessage);
+				console.error(error);
 			}
 		}
 	}
