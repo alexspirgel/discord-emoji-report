@@ -48,24 +48,46 @@ const DiscordHelpers = class {
 		return 'guild:' + guildId + '_channel:' + textChannelId + '_date:' + year + '-' + month + '-' + day;
 	}
 	static async isEmojiCollectionCacheStale(channel, emojiCollectionInfoDocument) {
+		/*
+		Ok so this logic hurts my brain every time I try and parse it.
+		Essentially this works as follows:
+		1. If the cache was incomplete the last time it was run, this means the cache is stale.
+			- Usually this happens if we tried to cache the current day and the day is not over yet.
+		2. If the emoji collection (collections are grouped by day) is within the 100 most recent messages or within the past 2 days, it is stale.
+			- Basically I am saying that I think it's not unreasonable to think that someone could add/remove an emoji:
+				* if it's one of the 100 most recent messages OR
+				* if the message is less than 2 days old
+			- The 100 messages check is a good catch for inactive channels that will have a lot of the most recent messages be older than 2 days.
+		3. If the emoji is older than 30 days and hasn't been cached since it became older than 30 days, it is stale.
+			- I wanted some type of archive system.
+			- After 30 days, if it hasn't been archive yet, archive it (by caching it again).
+			- After this archive point, the cache will always be fresh.
+		*/
+
+		// if the latest cache was not completed
+		// then the cache is stale
 		if (!emojiCollectionInfoDocument.cacheComplete) {
 			return true;
 		}
 
-		const recentMessageThresholdCount = 100;
-		const recentMessageThreshold = await DiscordHelpers.getMostRecentTextChannelMessageFromDateRange(channel, 0, Date.now(), (-1 * recentMessageThresholdCount));
+		const recentMessageThresholdCount = -99;
+		const recentMessageThreshold = await this.getMostRecentTextChannelMessageFromDateRange(channel, 0, Date.now(), (recentMessageThresholdCount));
 		const recentMessageThresholdDate = new Date(recentMessageThreshold.createdTimestamp);
 		const recentDateThresholdDays = -2;
 		const recentDateThresholdDate = DateHelpers.addDaysToDate(Date.now(), recentDateThresholdDays);
+		// if the emoji message date is newer than the 100 most recent message OR
+		// if the emoji message date is newer than 2 days ago
+		// then the cache is stale
 		if (emojiCollectionInfoDocument.date > recentMessageThresholdDate || emojiCollectionInfoDocument.date > recentDateThresholdDate) {
 			return true;
 		}
 	
-		const archiveDateThresholdDays = -15;
-		const archiveDateThreshold = DateHelpers.addDaysToDate(Date.now(), archiveDateThresholdDays);
-		const archiveCacheDateThresholdDays = 15;
-		const archiveCacheDateThreshold = DateHelpers.addDaysToDate(emojiCollectionInfoDocument.date, archiveCacheDateThresholdDays);
-	
+		const archiveDateThresholdDays = 30;
+		const archiveDateThreshold = DateHelpers.addDaysToDate(Date.now(), (-1 * archiveDateThresholdDays));
+		const archiveCacheDateThreshold = DateHelpers.addDaysToDate(emojiCollectionInfoDocument.date, archiveDateThresholdDays);
+		// if the emoji message date is older than 30 days ago AND
+		// if the emoji was last cached less than 30 days after its creation
+		// then the cache is stale
 		if (emojiCollectionInfoDocument.date < archiveDateThreshold && emojiCollectionInfoDocument.cachedDate < archiveCacheDateThreshold) {
 			return true;
 		}
@@ -77,6 +99,18 @@ const DiscordHelpers = class {
 			console.log(`Getting emojis in channel '${textChannel.name}' from between dates ${new Date(dateMinimum)} and ${new Date(dateMaximum)}.`);
 		}
 		let emojis = [];
+
+		try {
+			const mostRecentMessageFromChannel = await textChannel.messages.fetch(textChannel.lastMessageID);
+			if (mostRecentMessageFromChannel && mostRecentMessageFromChannel.createdTimestamp < dateMinimum) {
+				console.log(`Most recent message in channel '${textChannel.name}' is from before the starting date of the specified date range.`);
+				return emojis;
+			}
+		}
+		catch (error) {
+			// suppress
+		}
+
 		const dateRangeDays = DateHelpers.getDateDaysFromRange(dateMinimum, dateMaximum);
 
 		const databaseConnection = new DatabaseConnection(debug);
@@ -133,8 +167,8 @@ const DiscordHelpers = class {
 		return emojis;
 	}
 	static async getMostRecentTextChannelMessageFromDateRange(textChannel, dateMinimum, dateMaximum, offset = 0) {
-		if (offset < -100 || offset > 100) {
-			throw new Error('offset cannot be larger than 100.');
+		if (offset < -99 || offset > 99) {
+			throw new Error('offset cannot be larger than 99.');
 		}
 
 		if (DateHelpers.isValidDate(dateMinimum)) {
@@ -161,16 +195,27 @@ const DiscordHelpers = class {
 		let batch;
 		let match;
 		let matchOlder;
-		const mostRecentMessage = await textChannel.messages.fetch(textChannel.lastMessageID);
-		if (isMessageWithinRange(mostRecentMessage)) {
-			match = mostRecentMessage;
+		let mostRecentMessage;
+		try {
+			mostRecentMessage = await textChannel.messages.fetch(textChannel.lastMessageID);
+			if (mostRecentMessage && isMessageWithinRange(mostRecentMessage)) {
+				match = mostRecentMessage;
+			}
+			if (mostRecentMessage.createdTimestamp < dateMinimum) {
+				console.log(`Most recent message in channel '${textChannel.name}' is from before the starting date of the specified date range.`);
+				return null;
+			}
 		}
-		let lastMessageId = mostRecentMessage.id;
+		catch (error) {
+			// The last channel message was probably deleted, its id should still work for batch fetching though.
+		}
+
+		let batchLastMessageId = textChannel.lastMessageID;
 	
 		while (!match) {
 			// Get next batch of messages.
 			batch = await textChannel.messages.fetch({
-				before: lastMessageId,
+				before: batchLastMessageId,
 				limit: batchSize
 			});
 			// Sort by most recent first.
@@ -192,7 +237,7 @@ const DiscordHelpers = class {
 			}
 	
 			if (batch.last()) {
-				lastMessageId = batch.last().id;
+				batchLastMessageId = batch.last().id;
 			}
 			else {
 				break;
@@ -307,11 +352,11 @@ const DiscordHelpers = class {
 				}
 			}
 	
-			const unicodeEmojiStringsInContent = EmojiHelpers.getUnicodeEmojiStringsFromString(message.content);
-			for (const unicodeEmojiString of unicodeEmojiStringsInContent) {
+			const unicodeEmojiInContent = EmojiHelpers.getUnicodeEmojiStringsFromString(message.content);
+			for (const unicodeEmoji of unicodeEmojiInContent) {
 				try {
 					let emojiDocument = new EmojiDocument({
-						string: unicodeEmojiString,
+						string: unicodeEmoji.string,
 						type: 'unicode',
 						usage: 'content',
 						guildId: message.channel.guild.id,
@@ -348,8 +393,8 @@ const DiscordHelpers = class {
 						emojiObject.type = 'custom';
 					}
 					else {
-						const unicodeEmojiString = EmojiHelpers.getUnicodeEmojiStringsFromString(reaction.emoji.name);
-						emojiObject.string = unicodeEmojiString[0];
+						const unicodeEmoji = EmojiHelpers.getUnicodeEmojiStringsFromString(reaction.emoji.name);
+						emojiObject.string = unicodeEmoji[0].string;
 						emojiObject.type = 'unicode';
 					}
 					try {

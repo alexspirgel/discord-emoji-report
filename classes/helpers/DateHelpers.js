@@ -12,6 +12,10 @@ const DateHelpers = class {
 		date = new Date(date);
 		return new Date(new Date(date).setDate(date.getDate() + days));
 	}
+	static addHoursToDate(date, hours) {
+		date = new Date(date);
+		return new Date(new Date(date).setHours(date.getHours() + hours));
+	}
 	static addMillisecondsToDate(date, milliseconds) {
 		date = new Date(date);
 		return new Date((date.getTime()) + milliseconds);

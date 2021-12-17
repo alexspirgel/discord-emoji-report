@@ -72,14 +72,17 @@ const emojiErrors = [
 ];
 
 const EmojiHelpers = class {
+
 	static getCustomEmojiNameFromCustomEmojiString(customEmojiString) {
 		const regex = /(?<=<:)(.*)(?=:\d+>)/;
 		return customEmojiString.match(regex)[0];
 	}
+
 	static getCustomEmojiIdFromCustomEmojiString(customEmojiString) {
 		const regex = /(?<=:)(\d*)(?=>)/;
 		return customEmojiString.match(regex)[0];
 	}
+
 	static getCustomEmojiStringsFromString(string) {
 		const regex = /<:[^:\s]*(?:::[^:\s]*)*:\d+>/g;
 		const regexMatches = string.match(regex);
@@ -89,32 +92,51 @@ const EmojiHelpers = class {
 			for (match of regexMatches) {
 				matches.push({
 					name: this.getCustomEmojiNameFromCustomEmojiString(match),
-					string: match
+					type: 'custom',
+					string: match,
 				});
 			}
 		}
 		return matches;
 	}
+
 	static getUnicodeEmojiStringsFromString(string) {
 		let matches = [];
 		let match;
 		const regex = emojiRegex();
 		while (match = regex.exec(string)) {
-			matches.push(match[0]);
+			matches.push({
+				string: match[0],
+				type: 'unicode'
+			});
 		}
 
 		const additionalMatches = [];
 		let additionalMatch;
 		const additionalRegex = additionalEmojiRegex;
 		while (additionalMatch = additionalRegex.exec(string)) {
-			if (!matches.includes(additionalMatch)) {
-				additionalMatches.push(additionalMatch[0]);
+			const alreadyInMatches = matches.find((item) => {item.string === additionalMatch});
+			if (!alreadyInMatches) {
+				additionalMatches.push({
+					string: additionalMatch[0],
+					type: 'unicode'
+				});
 			}
 		}
 
 		matches = matches.concat(additionalMatches);
 		return matches;
 	}
+
+	static getEmojiStringsFromString(string) {
+		let emojis = [];
+		const customEmojis = this.getCustomEmojiStringsFromString(string);
+		emojis = emojis.concat(customEmojis);
+		const unicodeEmojis = this.getUnicodeEmojiStringsFromString(string);
+		emojis = emojis.concat(unicodeEmojis);
+		return emojis;
+	}
+
 };
 
 module.exports = EmojiHelpers;
